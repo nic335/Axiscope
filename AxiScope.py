@@ -10,7 +10,6 @@ axiscope.settings      = read_json_file(os.path.join(os.getcwd(), "settings.json
 
 
 import routes.index
-import routes.cam_control
 import routes.api
 import routes.tools
 

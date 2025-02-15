@@ -29,4 +29,4 @@ def get_printer_config():
     except:
         return jsonify({"success": False})
 
-    return jsonify({"success": True})
+    return jsonify({"success": True, "tool_numbers": [i for i in tools], "tool": axiscope.CURRENT_TOOL})
