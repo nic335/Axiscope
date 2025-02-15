@@ -1,0 +1,6 @@
+{
+    "host": "0.0.0.0",
+    "port": 5000,
+    "printer_url": "sc300.local",
+    "camera_path": "/webcam/?action=stream"
+}

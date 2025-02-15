@@ -1,0 +1,71 @@
+      
+{% block tools %}
+
+<div class="col p-3" id="tools-list">
+    <ul class="list-group">
+      {% for tool in tools %}
+        {% set is_active = tool == current_tool %}
+
+        <li class="list-group-item bg-body-tertiary p-2">
+
+          <div class="container">
+            <div class="row">
+              <div class="col-2">
+                <button type="button" class="btn btn-secondary btn-sm w-100 h-100{{ ' disabled' if is_active or not initialized else '' }}"><h1>T{{ tool }}</h1></button>
+              </div>
+
+              <div class="col-6">
+                <div class="row pb-4">
+                    <div class="input-group ps-1 pe-1">
+                      <button class="btn btn-secondary{{ ' disabled' if not is_active else '' }}" type="button" id="x-axis">X</button>
+                      <input type="number" class="form-control" placeholder="0.0" aria-label="Grab Current X Position" aria-describedby="x-axis" {{ 'disabled' if not is_active else '' }}>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="input-group ps-1 pe-1">
+                      <button class="btn btn-secondary{{ ' disabled' if not is_active else '' }}" type="button" id="y-axis">Y</button>
+                      <input type="number" class="form-control" placeholder="0.0" aria-label="Grab Current Y Position" aria-describedby="y-axis" {{ 'disabled' if not is_active else '' }}>
+                    </div>
+                </div>
+              </div>
+
+              <div class="col-4 border rounded bg-dark">
+                <div class="row">
+                  <div class="col-6 pt-1 pb-1">
+                  <div class="row pb-1">
+                    <span class="fs-6 lh-sm text-secondary"><small>Current X</small></span>
+                    <span class="fs-5 lh-sm text-secondary"><small>{{ tools[tool].gcode_x_offset }}</small></span>
+                  </div>
+                  <div class="row">
+                    <span class="fs-6 lh-sm text-secondary"><small>Current Y</small></span>
+                    <span class="fs-5 lh-sm text-secondary"><small>{{ tools[tool].gcode_y_offset }}</small></span>
+                  </div>
+                  </div>
+
+                  <div class="col-6 pt-2 pb-2">
+                  <div class="row pb-1">
+                    <span class="fs-6 lh-sm{{ ' text-secondary' if not is_active or not initialized else '' }}"><small>New X</small></span>
+                    <span class="fs-5 lh-sm{{ ' text-secondary' if not is_active or not initialized else '' }}"><small>0.0</small></span>
+                  </div>
+                  <div class="row">
+                    <span class="fs-6 lh-sm{{ ' text-secondary' if not is_active or not initialized else '' }}"><small>New Y</small></span>
+                    <span class="fs-5 lh-sm{{ ' text-secondary' if not is_active or not initialized else '' }}"><small>0.0</small></span>
+                  </div>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        </li>
+
+
+
+        {# <li class="list-group-item bg-body-tertiary">A second item</li> #}
+
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock tools %}
