@@ -1,15 +1,18 @@
 function updatePage() {
-  $.get(printer_url + "/printer/objects/query?gcode_move&toolhead&toolchanger&quad_gantry_level&stepper_enable", function(data){
+  $.get(printer_url + "/printer/objects/query?gcode_move&toolhead&motion_report&toolchanger&quad_gantry_level&stepper_enable", function(data){
     if (data['result']) {
 
       var positions   = data['result']['status']['gcode_move']['position'];
       var gcode_pos   = data['result']['status']['gcode_move']['gcode_position'];
+      var live_pos    = data['result']['status']['motion_report']['live_position'];
       var homed       = data['result']['status']['toolhead']['homed_axes'] == "xyz";
       var qgl_done    = data['result']['status']['quad_gantry_level']['applied'];
       var steppers    = data['result']['status']['stepper_enable']['steppers'];
       // var initialized = data['result']['status']['toolchanger']['status'] == "ready";
       var tool_number = data['result']['status']['toolchanger']['tool_number'];
       var tools       = data['result']['status']['toolchanger']['tool_numbers'];
+
+      console.log(live_pos);
 
       updatePositions(positions, gcode_pos);
       updateHoming(homed);
