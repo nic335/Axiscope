@@ -29,7 +29,7 @@ def initialize():
         app.jinja_env.globals.update(printer_url=printer_url)
 
         # serve(app, host='0.0.0.0', port=8080)
-        app.run(host="0.0.0.0", port=5000, debug=True)
+        app.run(host="0.0.0.0", port=settings['port'], debug=True)
 
 
         __INITIALIZED__ = True
