@@ -38,12 +38,18 @@ function updateHoming(homed) {
   if ($("#home-all").data("homed") != homed) {
     if (homed) {
       replaceClass("#home-all", "btn-danger", "btn-primary")
-      replaceClass("#home-x", "btn-dark", "btn-primary")
-      replaceClass("#home-y", "btn-dark", "btn-primary")
+      replaceClass("#home-fine-x", "btn-dark", "btn-primary")
+      replaceClass("#home-fine-y", "btn-dark", "btn-primary")
+      replaceClass("#home-course-x", "btn-dark", "btn-primary")
+      replaceClass("#home-course-y", "btn-dark", "btn-primary")
+      replaceClass("#home-course-z", "btn-dark", "btn-primary")
     } else {
       replaceClass("#home-all", "btn-primary", "btn-danger")
-      replaceClass("#home-x", "btn-primary", "btn-dark")
-      replaceClass("#home-y", "btn-primary", "btn-dark")
+      replaceClass("#home-fine-x", "btn-primary", "btn-dark")
+      replaceClass("#home-fine-y", "btn-primary", "btn-dark")
+      replaceClass("#home-course-x", "btn-primary", "btn-dark")
+      replaceClass("#home-course-y", "btn-primary", "btn-dark")
+      replaceClass("#home-course-z", "btn-primary", "btn-dark")
     }
 
     $("#home-all").data("homed", homed);

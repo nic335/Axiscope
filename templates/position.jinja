@@ -29,9 +29,7 @@
           <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-0.05') }}">-0.05</button>
           <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-0.10') }}">-0.10</button>
           <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-0.50') }}">-0.50</button>
-          <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-1.00') }}">-1.00</button>
-          <button type="button" class="btn btn-dark border border-dark" data-url="{{ printer_url('/printer/gcode/script?script=G28 {{ axis }}') }}" id="home-{{ axis|lower }}">{{ axis }}</button>
-          <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=1.00') }}">+1.00</button>
+          <button type="button" class="btn btn-dark border border-dark" data-url="{{ printer_url('/printer/gcode/script?script=G28') + axis }}" id="home-fine-{{ axis|lower }}">{{ axis }}</button>
           <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=0.50') }}">+0.50</button>
           <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=0.10') }}">+0.10</button>
           <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=0.05') }}">+0.05</button>
@@ -40,4 +38,26 @@
       </div>
     </div>
   {% endfor %}
+
+  <div class="row pt-3 justify-content-center">
+    {% for axis in ["X", "Y", "Z"] %}
+      <div class="row pb-1 ">
+        <div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Movement Toolbar">
+          <div class="btn-group btn-group-sm ps-5 pe-5" role="group" aria-label="">
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '1'   }}">-1</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '5'   }}">-5</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '10'  }}">-10</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '50'  }}">-50</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '100' }}">-100</button>
+            <button type="button" class="btn btn-dark border border-dark" data-url="{{ printer_url('/printer/gcode/script?script=G28') + axis }}" id="home-course-{{ axis|lower }}">{{ axis }}</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '100' }}">+100</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '50'  }}">+50</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '10'  }}">+10</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '5'   }}">+5</button>
+            <button type="button" class="btn btn-secondary border" data-url="{{ printer_url('/printer/gcode/script?script=G0 ')+ axis + '1'   }}">+1</button>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
 </div>
