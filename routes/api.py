@@ -1,7 +1,7 @@
 import axiscope
 from axiscope import app, printer_url
 from helpers.conversion import convert_str
-from flask import json, jsonify, render_template
+from flask import json, jsonify
 from urllib.request import urlopen
 
 @app.route("/xhr/get_printer_config")

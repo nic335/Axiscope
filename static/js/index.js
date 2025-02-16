@@ -174,8 +174,11 @@ function toolChangeURL(tool) {
   var url   = printer_url + "/printer/gcode/script?script=T" + tool;
 
   if (x_pos != "") {
+    url = url + "%0ASAVE_GCODE_STATE NAME=RESTORE_POS"
+    url = url + "%0AG90";
     url = url + "%0AG0 Z" + z_pos + " F3000";
     url = url + "%0AG0 X" + x_pos + " Y" + y_pos + " F12000";
+    url = url + "%0ARESTORE_GCODE_STATE NAME=RESTORE_POS"
   }
 
   return url;
