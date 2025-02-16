@@ -58,6 +58,7 @@ def bounce_move_url(axis, move, bounce_length=1, speed=500):
 
     return url
 
+
 def course_move_url(axis, move):
     url = printer_url("/printer/gcode/script?script=")
     url += "SAVE_GCODE_STATE NAME=course_move%0A"
