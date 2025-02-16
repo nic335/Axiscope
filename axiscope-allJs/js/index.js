@@ -198,6 +198,126 @@ function toolChangeURL(tool) {
 
 
 $(document).ready(function() {
+  printerIp = "192.168.2.37";
+  WebcamPath = "/webcam?action=stream";
+  const printerUrl = (printerIp,path) => `http://${printerIp}${path}`;
+
+  $("#zoom-image").attr("src",printerUrl(printerIp,WebcamPath));
+  $("#home-all").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=G28'));
+  $("#qgl").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=QUAD_GANTRY_LEVEL'));
+  $("#disable-motors").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=M84'));
+
+  printerIp = '192.168.2.37'
+  path = '/webcam?action=stream'
+
+  const bouncesComands = [
+      'SAVE_GCODE_STATE NAME=bounce_move',
+      'G91',
+      '-bounce-',
+      'RESTORE_GCODE_STATE NAME=bounce_move'
+  ];
+
+  function ComandsUrl(axis, value) {
+      url = "";
+      if(value>0){
+          bounce = value + .5
+          move = -.5;
+      }else{
+          bounce = value - .5
+          move = .5;
+      }
+      $.each(bouncesComands,function(k,comand){
+          if(comand == '-bounce-')
+              url += 'G0 '+axis+bounce+ ' F500%0AG0 '+axis+move+' F500%0A';
+          else
+              url += comand +"%0A";
+      });
+      return url;
+  }
+  
+  const bounceMove = (axis, value) => `http://${printerIp}/printer/gcode/script?script=`+ComandsUrl(axis,value);
+  //http://192.168.2.37/printer/gcode/script?script=SAVE_GCODE_STATE NAME=bounce_move%0AG91%0AG0 X-1.01 F500%0AG0 X1 F500%0A RESTORE_GCODE_STATE NAME=bounce_move
+  
+
+  const $container = $("#BouncePositionBar");
+
+  const axes = ["X", "Y"];
+  axes.forEach(axis => {
+      const $row = $('<div class="row pb-1"></div>');
+      const $toolbar = $('<div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Movement Toolbar"></div>');
+      const $btnGroup = $('<div class="btn-group btn-group-sm ps-5 pe-5" role="group"></div>');
+
+      [-0.01, -0.05, -0.1, -0.5].forEach(value => {
+          $('<button>', {
+              type: "button",
+              class: "btn btn-secondary border",
+              "data-url": bounceMove(axis, value),
+              text: value.toFixed(2)
+          }).appendTo($btnGroup);
+      });
+
+      $('<button>', {
+          type: "button",
+          class: "btn btn-dark border border-dark",
+          "data-url": printerUrl(`/printer/gcode/script?script=G28${axis}`),
+          id: `home-fine-${axis.toLowerCase()}`,
+          text: axis
+      }).appendTo($btnGroup);
+
+      [0.5, 0.1, 0.05, 0.01].forEach(value => {
+          $('<button>', {
+              type: "button",
+              class: "btn btn-secondary border",
+              "data-url": bounceMove(axis, value),
+              text: `+${value.toFixed(2)}`
+          }).appendTo($btnGroup);
+      });
+
+      $toolbar.append($btnGroup);
+      $row.append($toolbar);
+      $container.append($row);
+  });
+
+  const $containerBigPos = $("#BigPositionBar");
+
+  const axesBigPos = ["X", "Y", "Z"];
+  axesBigPos.forEach(axis => {
+      const $row = $('<div class="row pb-1"></div>');
+      const $toolbar = $('<div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Movement Toolbar"></div>');
+      const $btnGroup = $('<div class="btn-group btn-group-sm ps-5 pe-5" role="group"></div>');
+
+      [-50, -10, -5, -1].forEach(value => {
+          $('<button>', {
+              type: "button",
+              class: "btn btn-secondary border",
+              "data-url": bounceMove(axis, value),
+              text: value.toFixed(2)
+          }).appendTo($btnGroup);
+      });
+
+      $('<button>', {
+          type: "button",
+          class: "btn btn-dark border border-dark",
+          "data-url": printerUrl(`/printer/gcode/script?script=G28${axis}`),
+          id: `home-fine-${axis.toLowerCase()}`,
+          text: axis
+      }).appendTo($btnGroup);
+
+      [1, 5, 25, 50].forEach(value => {
+          $('<button>', {
+              type: "button",
+              class: "btn btn-secondary border",
+              "data-url": bounceMove(axis, value),
+              text: `+${value.toFixed(2)}`
+          }).appendTo($btnGroup);
+      });
+
+      $toolbar.append($btnGroup);
+      $row.append($toolbar);
+      $container.append($row);
+  });
+  
+
   $(document).on("click", ".getGcodes", function(e){
     navigator.clipboard.writeText($(this).find("input[axis=x]").val() +"\n"+ $(this).find("input[axis=y]").val());
   });
