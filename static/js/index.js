@@ -84,10 +84,16 @@ function updateMotor(enabled){
 
 
 function updateTools(tool_numbers, tn){
+  if(tn !== 0 ){
+    $("#capture-pos").addClass("disabled");
+  }
+  else{
+    $("#capture-pos").removeClass("disabled");
+  }
+
   $.each(tool_numbers, function(tool_no) {
     updateOffset(tool_no, "x");
     updateOffset(tool_no, "y");
-
     if (tn == tool_no) {
       if (!$("button[name=T"+tool_no+"]").hasClass("disabled")) {
         $("button[name=T"+tool_no+"]").addClass("disabled");
@@ -164,6 +170,10 @@ function updateOffset(tool, axis) {
     }
 
     $("#T"+tool+"-"+axis+"-new").find(">:first-child").text(new_offset.toFixed(3));
+    $("#T"+tool+"-"+axis+"-gcode").attr("value", "gcode_"+axis+"_offset: "+ new_offset.toFixed(3));
+
+    // gcode_x_offset: 0
+    // gcode_y_offset: 0
   }
 }
 
@@ -186,6 +196,10 @@ function toolChangeURL(tool) {
 
 
 $(document).ready(function() {
+  $(document).on("click", ".getGcodes", function(e){
+    navigator.clipboard.writeText($(this).find("input[axis=x]").val() +"\n"+ $(this).find("input[axis=y]").val());
+  });
+
   updatePage();
   getPrinterConfig();
 
@@ -195,6 +209,7 @@ $(document).ready(function() {
 
 
   $(document).on("click", "button", function(e){
+
     if ($(this).data("url")) {
       url = $(this).data("url");
 
