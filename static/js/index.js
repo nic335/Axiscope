@@ -155,11 +155,17 @@ function updateOffset(tool, axis) {
       position = 0.0;
     }
 
-    var new_offset = captured_pos - position + old_offset;
+    var new_offset = (captured_pos-old_offset) - position;
+
+    if (new_offset < 0) {
+      new_offset = Math.abs(new_offset);
+    } else {
+      new_offset = -new_offset;
+    }
+
     $("#T"+tool+"-"+axis+"-new").find(">:first-child").text(new_offset.toFixed(3));
   }
 }
-
 
 function toolChangeURL(tool) {
   var x_pos = $("#captured-x").find(">:first-child").text();

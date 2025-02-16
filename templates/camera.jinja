@@ -1,6 +1,6 @@
 {% block camera %}
   <div id="camContainer" class="img-overlay-wrap">
-    <img id="zoom-image" src="{{ printer_url('/webcam/stream') }}" width="800"/>
+    <img id="zoom-image" src="{{ printer_url(settings['camera_path']) }}" width="800"/>
     {% include "crosshair.jinja" %}
   </div>
   <div class="row p-2">
