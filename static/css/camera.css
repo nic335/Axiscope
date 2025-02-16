@@ -22,7 +22,7 @@
     height: auto;
     transition: transform 0.1s ease;
     object-fit: cover;
-    transition: filter 0.3s ease;
+    transition: filter 0.1s ease;
 }
 
 .img-overlay-wrap svg {
