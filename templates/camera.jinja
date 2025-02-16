@@ -26,45 +26,4 @@
       <i class="bi bi-brightness-high"></i>
     </div>
   </div>
-
-  {# <div class="container-fluid">
-    <div class="btn-group" role="group" aria-label="home">
-      <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=G28') }}">Home All</button>
-    </div>
-  </div> #}
-
-  {# <div class="container-fluid">
-    <div class="row">
-      <div class="col-3">
-        <span class="x-pos">0.0000</span>
-        <span class="y-pos">0.0000</span>
-        <span class="z-pos">0.0000</span>
-      </div>
-    </div>
-  </div> #}
-
-  {# <div class="container-fluid">
-    {% for axis in ["X", "Y"] %}
-      <div class="row">
-        <div class="col-3">
-          <div class="btn-group" role="group" aria-label="plus{{ axis }}">
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=1') }}">{{ axis }} +1mm</button>
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=0.1') }}">{{ axis }} +0.1mm</button>
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=0.05') }}">{{ axis }} +0.05mm</button>
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=0.01') }}">{{ axis }} +0.01mm</button>
-          </div>
-        </div>
-
-        <div class="col-3">
-          <div class="btn-group" role="group" aria-label="minus{{ axis }}">
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-1') }}">{{ axis }} -1mm</button>
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-0.1') }}">{{ axis }} -0.1mm</button>
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-0.05') }}">{{ axis }} -0.05mm</button>
-            <button type="button" class="btn btn-primary" data-url="{{ printer_url('/printer/gcode/script?script=_BOUNCE_MOVE AXIS='+axis+' MOVE=-0.01') }}">{{ axis }} -0.01mm</button>
-          </div>
-        </div>
-      </div>
-    {% endfor %}
-  </div> #}
-
 {% endblock camera %}
