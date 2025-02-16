@@ -1,7 +1,13 @@
+printerIp = "192.168.2.37";
+// printerIp = "10.0.0.241";
+WebcamPath = "/webcam?action=stream";
+printerUrl = (printerIp,path) => `http://${printerIp}${path}`;
+
 function updatePage() {
   // @TODO need to remove this hardcoding
-  printer_url = 'http://192.168.2.37';
-  $.get(printer_url + "/printer/objects/query?gcode_move&toolhead&toolchanger&quad_gantry_level&stepper_enable", function(data){
+
+  $.get(printerUrl(printerIp,"/printer/objects/query?gcode_move&toolhead&toolchanger&quad_gantry_level&stepper_enable"), function(data){
+    // console.log(printerUrl)
     if (data['result']) {
 
       var positions   = data['result']['status']['gcode_move']['position'];
@@ -197,17 +203,16 @@ function toolChangeURL(tool) {
 }
 
 
+
 $(document).ready(function() {
-  printerIp = "192.168.2.37";
-  WebcamPath = "/webcam?action=stream";
-  const printerUrl = (printerIp,path) => `http://${printerIp}${path}`;
+
+  
 
   $("#zoom-image").attr("src",printerUrl(printerIp,WebcamPath));
   $("#home-all").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=G28'));
   $("#qgl").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=QUAD_GANTRY_LEVEL'));
   $("#disable-motors").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=M84'));
 
-  printerIp = '192.168.2.37'
   path = '/webcam?action=stream'
 
   const bouncesComands = [
@@ -282,39 +287,47 @@ $(document).ready(function() {
 
   const axesBigPos = ["X", "Y", "Z"];
   axesBigPos.forEach(axis => {
-      const $row = $('<div class="row pb-1"></div>');
-      const $toolbar = $('<div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Movement Toolbar"></div>');
-      const $btnGroup = $('<div class="btn-group btn-group-sm ps-5 pe-5" role="group"></div>');
+    const $row = $('<div class="row pb-1"></div>');
+    const $toolbar = $('<div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Movement Toolbar"></div>');
+    const $btnGroup = $('<div class="btn-group btn-group-sm ps-5 pe-5" role="group"></div>');
 
-      [-50, -10, -5, -1].forEach(value => {
-          $('<button>', {
-              type: "button",
-              class: "btn btn-secondary border",
-              "data-url": bounceMove(axis, value),
-              text: value.toFixed(2)
-          }).appendTo($btnGroup);
-      });
-
+    if(axis != "Z")
+      tmp = [-50, -10, -5, -1];
+    else
+      tmp = [-25,-10,-1,-.1];
+    tmp.forEach(value => {
       $('<button>', {
           type: "button",
-          class: "btn btn-dark border border-dark",
-          "data-url": printerUrl(`/printer/gcode/script?script=G28${axis}`),
-          id: `home-fine-${axis.toLowerCase()}`,
-          text: axis
+          class: "btn btn-secondary border",
+          "data-url": bounceMove(axis, value),
+          text: value.toFixed(2)
       }).appendTo($btnGroup);
+    });
 
-      [1, 5, 25, 50].forEach(value => {
-          $('<button>', {
-              type: "button",
-              class: "btn btn-secondary border",
-              "data-url": bounceMove(axis, value),
-              text: `+${value.toFixed(2)}`
-          }).appendTo($btnGroup);
-      });
+    $('<button>', {
+        type: "button",
+        class: "btn btn-dark border border-dark",
+        "data-url": printerUrl(printerIp,`/printer/gcode/script?script=G28${axis}`),
+        id: `home-fine-${axis.toLowerCase()}`,
+        text: axis
+    }).appendTo($btnGroup);
 
-      $toolbar.append($btnGroup);
-      $row.append($toolbar);
-      $container.append($row);
+    if(axis != "Z")
+      tmp = [50, 10, 5, 1].reverse();
+    else
+      tmp = [25,10,1,.1].reverse();
+    tmp.forEach(value => {
+      $('<button>', {
+          type: "button",
+          class: "btn btn-secondary border",
+          "data-url": bounceMove(axis, value),
+          text: `+${value.toFixed(2)}`
+      }).appendTo($btnGroup);
+    });
+
+    $toolbar.append($btnGroup);
+    $row.append($toolbar);
+    $container.append($row);
   });
   
 
