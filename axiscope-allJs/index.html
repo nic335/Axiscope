@@ -24,15 +24,17 @@
     >
     </script>
 
-    <script>var printer_url = "{{ printer_url() }}";</script>
+    <script src="./js/settings.js"></script>
+
     <script src="./js/index.js"></script>
     <script src="./js/camera.js"></script>
+    <script src="./js/tools.js"></script>
+    <script src="./js/gcode.js"></script>
+
     <link rel="stylesheet" href="./css/camera.css">
   </head>
 
   <body data-bs-theme="dark">
-    <p>add gcode sender</p>
-
     <div class="container text-center">
         <div class="row">
             <!-- ----------- body.jinja------------------>
@@ -81,10 +83,6 @@
                         </ul>
                         </div>
                     
-                        <div class="row justify-content-center pb-1">
-                        {# <button type="button" class="btn btn-sm btn-secondary border w-50 ps-5 pe-5" id="capture-pos">CAPTURE CURRENT POSITION</button> #}
-                        </div>
-                    
                         <div class="row">
                         <div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Homing Toolbar">
                             <div class="btn-group btn-group-sm ps-5 pe-5 pb-1" role="group" aria-label="">
@@ -100,151 +98,20 @@
                     <!-- -------------------------- positioning ------------------- -->
                 </div>
             </div>
-            <div class="col p-3" id="tools-list">
-                <ul class="list-group">
-                    {% for tool in tools %}
-                    {% set is_active = tool == current_tool %}
-                    {% set change_gcode = printer_url('/printer/gcode/script?script=T') + tool|string %}
-            
-                    <li class="list-group-item bg-body-tertiary p-2">
-                        <div class="container">
-                        <div class="row">
-                            <div class="col-2">
-                            <button 
-                                type="button"
-                                class="btn btn-secondary btn-sm w-100 h-100 {{ 'disabled' if is_active or not initialized else '' }}"
-                                id="toolchange"
-                                name="T{{ tool }}"
-                                data-tool="{{ tool }}"
-                                
-                            >
-                                <h1>T{{ tool }}</h1>
-                            </button>
-                            </div>
-            
-                            {% if tool == 0 %}
-                            <div class="col-6" >
-                                {# ----------------------- #}
-                                <button type="button" class="btn btn-sm btn-secondary fs-6 border text-center h-100 w-100 ps-5 pe-5" style="padding-bottom:5px; padding-top:5px;" id="capture-pos">CAPTURE <br/> CURRENT <br/> POSITION</button>
-                            </div>
-            
-                            <div class="col-4 border rounded bg-dark">
-                                <div class="row">
-                                <span class="fs-6 lh-sm pt-1 pb-1"><small>Captured Position</small></span>
-                                <div class="row justify-content-center">
-                                    <div class="col-1 ms-4">
-                                    <span class="fs-5 lh-sm"><small>X:</small></span>
-                                    </div>
-                                    <div class="col-6">
-                                    <span class="fs-5 lh-sm" id="captured-x" data-axis="x"><small></small></span>
-                                    </div>
-                                </div>
-                                <div class="row justify-content-center">
-                                    <div class="col-1 ms-4">
-                                    <span class="fs-5 lh-sm"><small>Y:</small></span>
-                                    </div>
-                                    <div class="col-6">
-                                    <span class="fs-5 lh-sm" id="captured-y" data-axis="y"><small></small></span>
-                                    </div>
-                                </div>
-                                <div class="row justify-content-center">
-                                    <div class="col-1 ms-4">
-                                    <span class="fs-5 lh-sm"><small>Z:</small></span>
-                                    </div>
-                                    <div class="col-6">
-                                    <span class="fs-5 lh-sm" id="captured-z" data-axis="z"><small></small></span>
-                                    </div>
-                                </div>
-                                </div>
-                            </div>
-                            {% else %}
-                            <div class="col-6">
-                                <div class="row pb-4">
-                                    <div class="input-group ps-1 pe-1">
-                                    <button 
-                                        class="btn btn-secondary {{ 'disabled' if not is_active else '' }}" 
-                                        type="button" 
-                                        id="T{{ tool }}-fetch-x" 
-                                        data-axis="x" 
-                                        data-tool="{{ tool }}" 
-                                    >X</button>
-                                    <input 
-                                        type="number" 
-                                        name="T{{ tool }}-x-pos"
-                                        class="form-control" 
-                                        placeholder="0.0" 
-                                        aria-label="Grab Current X Position" 
-                                        aria-describedby="x-axis" 
-                                        data-axis="x" 
-                                        data-tool="{{ tool }}" 
-                                        {{ 'disabled' if not is_active else '' }}
-                                    >
-                                    </div>
-                                </div>
-            
-                                <div class="row">
-                                    <div class="input-group ps-1 pe-1">
-                                    <button 
-                                        class="btn btn-secondary {{ 'disabled' if not is_active else '' }}" 
-                                        type="button" 
-                                        id="T{{ tool }}-fetch-y" 
-                                        data-axis="y" 
-                                        data-tool="{{ tool }}" 
-                                    >Y</button>
-                                    <input 
-                                        type="number" 
-                                        name="T{{ tool }}-y-pos"
-                                        class="form-control" 
-                                        placeholder="0.0" 
-                                        aria-label="Grab Current Y Position" 
-                                        aria-describedby="y-axis" 
-                                        data-axis="y" 
-                                        data-tool="{{ tool }}" 
-                                        {{ 'disabled' if not is_active else '' }}
-                                    >
-                                    </div>
-                                </div>
-                            </div>
-            
-                            <div class="col-4 border rounded bg-dark">
-                                <div class="row">
-                                <div class="col-6 pt-1 pb-1">
-                                    <div class="row pb-1">
-                                    <span class="fs-6 lh-sm text-secondary"><small>Current X</small></span>
-                                    <span class="fs-5 lh-sm text-secondary" id="T{{ tool }}-x-offset"><small>{{ tools[tool].gcode_x_offset|default(0.0) }}</small></span>
-                                    </div>
-                                    <div class="row">
-                                    <span class="fs-6 lh-sm text-secondary"><small>Current Y</small></span>
-                                    <span class="fs-5 lh-sm text-secondary" id="T{{ tool }}-y-offset"><small>{{ tools[tool].gcode_y_offset|default(0.0) }}</small></span>
-                                    </div>
-                                </div>
-            
-                                <div class="col-6 pt-2 pb-2 getGcodes" toolId="{{tool}}">
-                                    <div class="row pb-1">
-                                    <span class="fs-6 lh-sm"><small>New X</small></span>
-                                    <span class="fs-5 lh-sm" id="T{{ tool }}-x-new"><small>0.0</small></span>
-                                    <input type="text" hidden="hidden" id="T{{ tool }}-x-gcode" axis="x" value="">
-                                    </div>
-                                    <div class="row">
-                                    <span class="fs-6 lh-sm"><small>New Y</small></span>
-                                    <span class="fs-5 lh-sm" id="T{{ tool }}-y-new"><small>0.0</small></span>
-                                    <input type="text" hidden="hidden" id="T{{ tool }}-y-gcode" axis="y" value="0">
-                                    </div>
-                                </div>
-                                </div>
-                            </div>
-                            {% endif %}
-            
-                        </div>
-                        </div>
-                    </li>
-            
-            
-            
-                    {# <li class="list-group-item bg-body-tertiary">A second item</li> #}
-            
-                    {% endfor %}
-                </ul>
+            <div class="col p-3">
+                <div class="border border-secondary-subtle rounded bg-body-tertiary p-2 mb-3">
+                <div class="row p-2 pb-2">
+                    <div class="col-9">
+                    <input type="text" class="w-100 form-control" placeholder="" id="gcode-input">
+                    </div>
+                    <div class="col-3">
+                    <button type="button" class="btn btn-dark w-100" id="gcode-send">Send</button>
+                    </div>
+                </div>
+                </div>
+
+                <ul class="list-group" id="tool-list"></ul>
+
             </div>
         </div>
     </div>

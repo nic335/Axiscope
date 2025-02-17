@@ -1,6 +1,3 @@
-printerIp = "192.168.2.37";
-// printerIp = "10.0.0.241";
-WebcamPath = "/webcam?action=stream";
 printerUrl = (printerIp,path) => `http://${printerIp}${path}`;
 
 function updatePage() {
@@ -91,36 +88,6 @@ function updateMotor(enabled){
 }
 
 
-function updateTools(tool_numbers, tn){
-  if(tn !== 0 ){
-    $("#capture-pos").addClass("disabled");
-  }
-  else{
-    $("#capture-pos").removeClass("disabled");
-  }
-
-  $.each(tool_numbers, function(tool_no) {
-    updateOffset(tool_no, "x");
-    updateOffset(tool_no, "y");
-    if (tn == tool_no) {
-      if (!$("button[name=T"+tool_no+"]").hasClass("disabled")) {
-        $("button[name=T"+tool_no+"]").addClass("disabled");
-        $("#T"+tool_no+"-fetch-x").removeClass("disabled");
-        $("#T"+tool_no+"-fetch-y").removeClass("disabled");
-        $("input[name=T"+tool_no+"-x-pos]").removeAttr("disabled");
-        $("input[name=T"+tool_no+"-y-pos]").removeAttr("disabled");
-      }
-    } else if ($("button[name=T"+tool_no+"]").hasClass("disabled")) {
-      $("button[name=T"+tool_no+"]").removeClass("disabled");
-      $("#T"+tool_no+"-fetch-x").addClass("disabled");
-      $("#T"+tool_no+"-fetch-y").addClass("disabled");
-      $("input[name=T"+tool_no+"-x-pos]").attr("disabled", "disabled");
-      $("input[name=T"+tool_no+"-y-pos]").attr("disabled", "disabled");
-    }
-  });
-}
-
-
 function checkActiveStepper(array) {
   var result = false;
 
@@ -135,20 +102,6 @@ function checkActiveStepper(array) {
 }
 
 
-function getPrinterConfig() {
-  $.get("/xhr/get_printer_config", function(data){
-    $.get("/xhr/all_tools", function(jinja){
-      $('#tools-list').replaceWith(jinja);
-    });
-
-    var tools   = data['tool_numbers'];
-    var tool_no = data['tool'];
-
-    updateTools(tools, tool_no);
-  });
-}
-
-
 function replaceClass(id, old_class, new_class) {
   if ($(id).hasClass(old_class)) {
     $(id).removeClass(old_class);
@@ -157,57 +110,7 @@ function replaceClass(id, old_class, new_class) {
 }
 
 
-function updateOffset(tool, axis) {
-  var captured_pos = $("#captured-"+axis).text();
-
-  if (captured_pos != "") {
-    captured_pos   = parseFloat(captured_pos);
-    var position   = parseFloat($("input[name=T"+tool+"-"+axis+"-pos]").val());
-    var old_offset = parseFloat($("#T"+tool+"-"+axis+"-offset").text());
-
-    if (isNaN(position)) {
-      position = 0.0;
-    }
-
-    var new_offset = (captured_pos-old_offset) - position;
-
-    if (new_offset < 0) {
-      new_offset = Math.abs(new_offset);
-    } else {
-      new_offset = -new_offset;
-    }
-
-    $("#T"+tool+"-"+axis+"-new").find(">:first-child").text(new_offset.toFixed(3));
-    $("#T"+tool+"-"+axis+"-gcode").attr("value", "gcode_"+axis+"_offset: "+ new_offset.toFixed(3));
-
-    // gcode_x_offset: 0
-    // gcode_y_offset: 0
-  }
-}
-
-function toolChangeURL(tool) {
-  var x_pos = $("#captured-x").find(">:first-child").text();
-  var y_pos = $("#captured-y").find(">:first-child").text();
-  var z_pos = $("#captured-z").find(">:first-child").text();
-  var url   = printer_url + "/printer/gcode/script?script=T" + tool;
-
-  if (x_pos != "") {
-    url = url + "%0ASAVE_GCODE_STATE NAME=RESTORE_POS"
-    url = url + "%0AG90";
-    url = url + "%0AG0 Z" + z_pos + " F3000";
-    url = url + "%0AG0 X" + x_pos + " Y" + y_pos + " F12000";
-    url = url + "%0ARESTORE_GCODE_STATE NAME=RESTORE_POS"
-  }
-
-  return url;
-}
-
-
-
 $(document).ready(function() {
-
-  
-
   $("#zoom-image").attr("src",printerUrl(printerIp,WebcamPath));
   $("#home-all").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=G28'));
   $("#qgl").attr("data-url",printerUrl(printerIp,'/printer/gcode/script?script=QUAD_GANTRY_LEVEL'));
@@ -336,7 +239,7 @@ $(document).ready(function() {
   });
 
   updatePage();
-  getPrinterConfig();
+  getTools();
 
   setInterval(function(){
     updatePage();
