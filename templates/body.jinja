@@ -10,9 +10,21 @@
     </div>
   </div>
 
-  <div class="col p-3" id="tools-list">
-    <ul class="list-group" id="tool-list">
-    </ul>
+  <div class="col p-3">
+    <div class="border border-secondary-subtle rounded bg-body-tertiary p-2 mb-3">
+      <div class="row p-2 pb-2">
+        <div class="col-9">
+          <input type="text" class="w-100 form-control" placeholder="" id="gcode-input">
+        </div>
+        <div class="col-3">
+          <button type="button" class="btn btn-dark w-100" id="gcode-send">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="list-group" id="tool-list"></ul>
+
   </div>
+
 
 {% endblock body %}

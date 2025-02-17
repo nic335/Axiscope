@@ -4,7 +4,7 @@ function updatePage() {
 
       var positions   = data['result']['status']['gcode_move']['position'];
       var gcode_pos   = data['result']['status']['gcode_move']['gcode_position'];
-      var live_pos    = data['result']['status']['motion_report']['live_position'];
+      // var live_pos    = data['result']['status']['motion_report']['live_position'];
       var homed       = data['result']['status']['toolhead']['homed_axes'] == "xyz";
       var qgl_done    = data['result']['status']['quad_gantry_level']['applied'];
       var steppers    = data['result']['status']['stepper_enable']['steppers'];
@@ -12,7 +12,7 @@ function updatePage() {
       var tool_number = data['result']['status']['toolchanger']['tool_number'];
       var tools       = data['result']['status']['toolchanger']['tool_numbers'];
 
-      console.log(live_pos);
+      // console.log(live_pos);
 
       updatePositions(positions, gcode_pos);
       updateHoming(homed);
