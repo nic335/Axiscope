@@ -5,23 +5,13 @@ INIT_LOCK = Lock()
 app             = None
 settings        = None
 __INITIALIZED__ = False
-PRINTER_CONFIG  = None
-TOOLS           = None
-CURRENT_TOOL    = -1
-
-
-
-
-# FULL_PATH       = None
-# RUN_DIR         = None
-# ARGS            = None
 
 
 def initialize():
     """Init function for this module"""
     with INIT_LOCK:
 
-        global __INITIALIZED__, app, settings, PRINTER_CONFIG, TOOLS, CURRENT_TOOL #, FULL_PATH, RUN_DIR, ARGS
+        global __INITIALIZED__, app, settings
 
         if __INITIALIZED__:
             return False
