@@ -195,6 +195,7 @@ function getTools() {
     url = url.substring(0, url.length-1);
 
     $.get(url, function(data){
+      $("#tool-list").html('');
       $.each(tool_numbers, function(i) {
         var tool_number = data['result']['status'][tool_names[i]]['tool_number'];
         var cx_offset   = data['result']['status'][tool_names[i]]['gcode_x_offset'].toFixed(3);

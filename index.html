@@ -32,14 +32,93 @@
     <script src="./js/gcode.js"></script>
 
     <link rel="stylesheet" href="./css/camera.css">
+
+    <style>
+        .modal-content {
+            border-radius: 10px;
+        }
+        .form-control:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        #camera-select {
+            display: none;
+        }
+        .camera-option {
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: 1px solid #dee2e6;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .camera-option:hover {
+            background-color: #f8f9fa;
+        }
+        .camera-option.selected {
+            border-color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+        .camera-preview {
+            width: 160px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .camera-list-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
   </head>
 
   <body data-bs-theme="dark">
+    <!-- Printer IP Modal -->
+    <div class="modal fade" id="printerModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="printerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="printerModalLabel">Printer Configuration</h5>
+                </div>
+                <div class="modal-body">
+                    <!-- IP Address Input -->
+                    <div class="mb-3">
+                        <label for="printerIp" class="form-label">Printer IP Address</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="printerIp" placeholder="Enter IP address (e.g., 192.168.1.100)">
+                            <button class="btn btn-outline-danger" type="button" id="disconnectBtn" style="display: none;">
+                                Disconnect
+                            </button>
+                        </div>
+                        <div id="ipError" class="text-danger mt-2" style="display: none;">
+                            Invalid IP address format
+                        </div>
+                    </div>
+
+                    <!-- Camera Selection (initially hidden) -->
+                    <div id="camera-select" class="mb-3">
+                        <label class="form-label">Select Camera</label>
+                        <div class="camera-list-container">
+                            <div id="cameraList" class="list-group">
+                                <!-- Camera options will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="saveIpBtn">Save IP</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container text-center">
         <div class="row">
             <!-- ----------- body.jinja------------------>
             <div class="col p-3">
                 <div class="border border-secondary-subtle rounded bg-body-tertiary p-2">
+                    <div class="row p-2 pb-2">
+                        <button name="ChangePrinter" id="ChangePrinter">Change Printer / Camera</button>
+                    </div>
                     <div class="row p-2 pb-2">
                         <div id="camContainer" class="img-overlay-wrap">
                         <img id="zoom-image" src="" width="800"/>
@@ -116,6 +195,5 @@
         </div>
     </div>
   </body>
-
   <footer></footer>
 </html>
