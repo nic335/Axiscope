@@ -1,5 +1,8 @@
 // Global variables and utility functions
+let printerIp = '';
+let WebcamPath = '/webcam?action=stream';
 let path = '/webcam?action=stream';
+let updateInterval = null;
 
 function printerUrl(ip, endpoint) {
     return `http://${ip}${endpoint}`;
@@ -54,49 +57,49 @@ function updatePositions(positions, gcode_pos){
 }
 
 function updateHoming(homed) {
-  if ($("#home-all").data("homed") != homed) {
-    if (homed) {
-      replaceClass("#home-all", "btn-danger", "btn-primary")
-      replaceClass("#home-fine-x", "btn-dark", "btn-primary")
-      replaceClass("#home-fine-y", "btn-dark", "btn-primary")
-      replaceClass("#home-course-x", "btn-dark", "btn-primary")
-      replaceClass("#home-course-y", "btn-dark", "btn-primary")
-      replaceClass("#home-course-z", "btn-dark", "btn-primary")
-    } else {
-      replaceClass("#home-all", "btn-primary", "btn-danger")
-      replaceClass("#home-fine-x", "btn-primary", "btn-dark")
-      replaceClass("#home-fine-y", "btn-primary", "btn-dark")
-      replaceClass("#home-course-x", "btn-primary", "btn-dark")
-      replaceClass("#home-course-y", "btn-primary", "btn-dark")
-      replaceClass("#home-course-z", "btn-primary", "btn-dark")
-    }
-
+    // Always update the data attribute first
     $("#home-all").data("homed", homed);
-  }
+
+    // Force update the button states
+    if (homed) {
+        replaceClass("#home-all", "btn-danger", "btn-primary");
+        replaceClass("#home-fine-x", "btn-dark", "btn-primary");
+        replaceClass("#home-fine-y", "btn-dark", "btn-primary");
+        replaceClass("#home-course-x", "btn-dark", "btn-primary");
+        replaceClass("#home-course-y", "btn-dark", "btn-primary");
+        replaceClass("#home-course-z", "btn-dark", "btn-primary");
+    } else {
+        replaceClass("#home-all", "btn-primary", "btn-danger");
+        replaceClass("#home-fine-x", "btn-primary", "btn-dark");
+        replaceClass("#home-fine-y", "btn-primary", "btn-dark");
+        replaceClass("#home-course-x", "btn-primary", "btn-dark");
+        replaceClass("#home-course-y", "btn-primary", "btn-dark");
+        replaceClass("#home-course-z", "btn-primary", "btn-dark");
+    }
 }
 
 function updateQGL(qgl_done) {
-  if ($("#qgl").data("qgl") != qgl_done) {
-    if (qgl_done) {
-      replaceClass("#qgl", "btn-danger", "btn-primary")
-    } else {
-      replaceClass("#qgl", "btn-primary", "btn-danger")
-    }
-
+    // Always update the data attribute first
     $("#qgl").data("qgl", qgl_done);
-  }
+
+    // Force update the button state
+    if (qgl_done) {
+        replaceClass("#qgl", "btn-danger", "btn-primary");
+    } else {
+        replaceClass("#qgl", "btn-primary", "btn-danger");
+    }
 }
 
-function updateMotor(enabled){
-  if ($("#disable-motors").data("motoron") != enabled) {
-    if (enabled) {
-      replaceClass("#disable-motors", "btn-danger", "btn-primary")
-    } else {
-      replaceClass("#disable-motors", "btn-primary", "btn-danger")
-    }
-
+function updateMotor(enabled) {
+    // Always update the data attribute first
     $("#disable-motors").data("motoron", enabled);
-  }
+
+    // Force update the button state
+    if (enabled) {
+        replaceClass("#disable-motors", "btn-danger", "btn-primary");
+    } else {
+        replaceClass("#disable-motors", "btn-primary", "btn-danger");
+    }
 }
 
 function checkActiveStepper(array) {
@@ -146,7 +149,6 @@ function ComandsUrl(axis, value) {
     return url;
 }
 
-const bounceMove = (axis, value) => `http://${printerIp}/printer/gcode/script?script=`+ComandsUrl(axis,value);
 // Event handlers for printer modal
 $(document).ready(function() {
     $("#ChangePrinter").click(function(){
@@ -214,7 +216,6 @@ $(document).ready(function() {
                                                     <img src="${snapshotUrl}" 
                                                          class="camera-preview"
                                                          alt="${cam.name}"
-                                                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22120%22><rect width=%22160%22 height=%22120%22 fill=%22%23dee2e6%22/><text x=%2280%22 y=%2260%22 fill=%22%23666%22 text-anchor=%22middle%22>Loading...</text></svg>'">
                                                 </div>
                                                 <div>
                                                     <h6 class="mb-0">${cam.name}</h6>
@@ -260,6 +261,58 @@ $(document).ready(function() {
     });
 
     // Camera selection handler
+    function connectCamera(selectedUrl) {
+        // Stop any existing update interval
+        if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+        }
+
+        const selectedIp = $('#printerIp').val();
+        const webcamPath = selectedUrl.split(selectedIp)[1];  // Extract the path part
+        
+        // Update variables directly
+        printerIp = selectedIp; // Update the global variable
+        WebcamPath = webcamPath;
+        
+        // Update UI
+        $("#zoom-image").attr("src", printerUrl(printerIp, WebcamPath));
+        
+        // Initialize button URLs and data attributes
+        $("#home-all")
+            .attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=G28'))
+            .attr("data-homed", "false")
+            .addClass("btn-danger").removeClass("btn-primary");
+            
+        $("#qgl")
+            .attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=QUAD_GANTRY_LEVEL'))
+            .attr("data-qgl", "false")
+            .addClass("btn-danger").removeClass("btn-primary");
+            
+        $("#disable-motors")
+            .attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=M84'))
+            .attr("data-motoron", "false")
+            .addClass("btn-danger").removeClass("btn-primary");
+        
+        // Show the camera container
+        $('#camContainer').fadeIn();
+        
+        // Close the modal
+        $('#printerModal').modal('hide');
+        
+        // Clear any existing position bars
+        $('#BouncePositionBar, #BigPositionBar').empty();
+        
+        // Initialize position bars and other UI
+        initializePositionBars();
+        
+        // Start the update cycle
+        updatePage();
+        getTools();
+        updateInterval = setInterval(updatePage, 1000);
+    }
+
+    // Camera selection click handler
     $(document).on('click', '.camera-option', function() {
         const selectedUrl = $(this).data('url');
         if (selectedUrl) {
@@ -267,39 +320,32 @@ $(document).ready(function() {
             // Update selection visual
             $('.camera-option').removeClass('selected');
             $(this).addClass('selected');
-            // Store the selected camera URL
-            window.selectedCameraUrl = selectedUrl;
             // Update button state
-            $('#saveIpBtn').html('Connect to Camera').prop('disabled', false)
-                .removeClass('btn-success').addClass('btn-primary')
-                .off('click')  // Remove previous click handlers
+            $('#saveIpBtn')
+                .html('Connect to Camera')
+                .prop('disabled', false)
+                .removeClass('btn-success')
+                .addClass('btn-primary')
+                .off('click')
                 .on('click', function() {
-                    const selectedIp = $('#printerIp').val();
-                    const webcamPath = selectedUrl.split(selectedIp)[1];  // Extract the path part
-                    
-                    // Update variables directly
-                    window.printerIp = selectedIp;
-                    window.WebcamPath = webcamPath;
-                    
-                    // Update UI
-                    $("#zoom-image").attr("src", printerUrl(selectedIp, webcamPath));
-                    $("#home-all").attr("data-url", printerUrl(selectedIp, '/printer/gcode/script?script=G28'));
-                    $("#qgl").attr("data-url", printerUrl(selectedIp, '/printer/gcode/script?script=QUAD_GANTRY_LEVEL'));
-                    $("#disable-motors").attr("data-url", printerUrl(selectedIp, '/printer/gcode/script?script=M84'));
-                    
-                    // Close the modal
-                    $('#printerModal').modal('hide');
-                    
-                    // Start the update cycle
-                    updatePage();
-                    getTools();
-                    setInterval(updatePage, 1000);
+                    connectCamera(selectedUrl);
                 });
         }
     });
 
     // Disconnect handler
     $('#disconnectBtn').on('click', function() {
+        // Stop update interval
+        if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+        }
+
+        // Reset global variables
+        printerIp = '';
+        WebcamPath = '/webcam?action=stream';
+        path = '/webcam?action=stream';
+
         // Enable IP input
         $('#printerIp').prop('disabled', false);
         
@@ -308,6 +354,9 @@ $(document).ready(function() {
         
         // Hide camera selection
         $('#camera-select').hide();
+        
+        // Hide camera container
+        $('#camContainer').hide();
         
         // Reset button state
         $('#saveIpBtn').html('Save IP')
@@ -320,27 +369,27 @@ $(document).ready(function() {
         
         // Clear camera list
         $('#cameraList').empty();
+
+        // Clear position bars
+        $('#BouncePositionBar, #BigPositionBar').empty();
     });
 
-    // Initialize UI components
-    $("#zoom-image").attr("src", printerUrl(printerIp, WebcamPath));
-    $("#home-all").attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=G28'));
-    $("#qgl").attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=QUAD_GANTRY_LEVEL'));
-    $("#disable-motors").attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=M84'));
+    // // Initialize UI components
+    // $("#zoom-image").attr("src", printerUrl(printerIp, WebcamPath));
+    // $("#home-all").attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=G28'));
+    // $("#qgl").attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=QUAD_GANTRY_LEVEL'));
+    // $("#disable-motors").attr("data-url", printerUrl(printerIp, '/printer/gcode/script?script=M84'));
 
-    // Initialize position bars
-    initializePositionBars();
-    
-    // Start page updates
-    updatePage();
-    getTools();
-    setInterval(updatePage, 1000);
+    // dont think we need that just yet
+
+    // Don't initialize anything until printer and camera are connected
 });
 
 // Initialize position bars
 function initializePositionBars() {
-
-    // const bounceMove = (axis, value) => `http://${printerIp}/printer/gcode/script?script=`+ComandsUrl(axis,value);
+    const bounceMove = (axis, value) => printerUrl(printerIp, '/printer/gcode/script?script=' + ComandsUrl(axis,value));
+    // Clear both position bar containers
+    $('#BouncePositionBar, #BigPositionBar').empty();
     const $container = $("#BouncePositionBar");
     const axes = ["X", "Y"];
     

@@ -141,12 +141,12 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
             <div class="row pb-1">
               <span class="fs-6 lh-sm"><small>New X</small></span>
               <span class="fs-5 lh-sm" id="T${tool_number}-x-new"><small>0.0</small></span>
-              <input type="text" hidden="hidden" id="T${tool_number}-x-gcode" axis="x" value="">
+              <button class="btn btn-link btn-sm p-0 text-decoration-none" id="T${tool_number}-x-gcode" axis="x" style="font-size: 0.8em;">Click to copy</button>
             </div>
             <div class="row">
               <span class="fs-6 lh-sm"><small>New Y</small></span>
               <span class="fs-5 lh-sm" id="T${tool_number}-y-new"><small>0.0</small></span>
-              <input type="text" hidden="hidden" id="T${tool_number}-y-gcode" axis="y" value="0">
+              <button class="btn btn-link btn-sm p-0 text-decoration-none" id="T${tool_number}-y-gcode" axis="y" style="font-size: 0.8em;">Click to copy</button>
             </div>
           </div>
         </div>
@@ -222,11 +222,11 @@ function getTools() {
 
 
 function updateTools(tool_numbers, tn){
-  if(tn !== 0 ){
-    $("#capture-pos").addClass("disabled");
-  }
-  else{
-    $("#capture-pos").removeClass("disabled");
+  const $captureBtn = $("#capture-pos");
+  if(tn !== 0) {
+    $captureBtn.addClass("disabled").prop("disabled", true);
+  } else {
+    $captureBtn.removeClass("disabled").prop("disabled", false);
   }
 
   $.each(tool_numbers, function(tool_no) {
@@ -271,10 +271,24 @@ function updateOffset(tool, axis) {
       new_offset = -new_offset;
     }
 
-    $("#T"+tool+"-"+axis+"-new").find(">:first-child").text(new_offset.toFixed(3));
-    $("#T"+tool+"-"+axis+"-gcode").attr("value", "gcode_"+axis+"_offset: "+ new_offset.toFixed(3));
+    const newOffsetText = new_offset.toFixed(3);
+    const gcodeCommand = `gcode_${axis}_offset: ${newOffsetText}`;
+    
+    // Update display
+    $(`#T${tool}-${axis}-new`).find('>:first-child').text(newOffsetText);
+    $(`#T${tool}-${axis}-gcode`).attr('value', gcodeCommand);
 
-    // gcode_x_offset: 0
-    // gcode_y_offset: 0
+    // Add click handler for copying to clipboard
+    $(`#T${tool}-${axis}-gcode`).off('click').on('click', function() {
+      navigator.clipboard.writeText(gcodeCommand).then(() => {
+        // Visual feedback that it was copied
+        const $this = $(this);
+        const originalText = $this.text();
+        $this.text('Copied!');
+        setTimeout(() => $this.text(originalText), 1000);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+      });
+    });
   }
 }
