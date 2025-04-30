@@ -9,6 +9,11 @@ function printerUrl(ip, endpoint) {
 }
 
 function isValidIP(ip) {
+    // Allow hostnames (including .local domains)
+    const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])*(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])*)*$/;
+    if (hostnameRegex.test(ip)) return true;
+    
+    // Check for IPv4
     const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
     if (!ipRegex.test(ip)) return false;
     
