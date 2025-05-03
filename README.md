@@ -50,8 +50,6 @@ The install script will:
 2. Go to the Machine tab
 3. Find 'axiscope' in the services list
 4. Use the Start/Stop button to control the service
-<img src="media/ServiceControl.png" alt="Alt text" width="250"/>
-
 ## Usage Guide
 
 ### Initial Setup
@@ -69,16 +67,26 @@ The install script will:
 <img style="padding-bottom: 10px;" src="media/saveOffset.png" alt="Alt text" width="500"/><br/>
 <img style="padding-bottom: 10px;" src="media/Calculated.png" alt="Alt text" width="500"/><br/>
 
-## Integration with Mainsail
-
-AxisScope integrates directly with Mainsail:
-
-- Appears in update manager
+## Credits
+[Nic335](https://github.com/nic335) and [N3MI-DG](https://github.com/N3MI-DG)
 
 ## License
+MIT License
 
-[Placeholder: License information]
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-## Credits
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-[Placeholder: Acknowledgments and credits]
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
