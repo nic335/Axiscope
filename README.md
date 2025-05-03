@@ -16,7 +16,7 @@ AxisScope is a specialized tool designed to simplify the XY calibration process 
 
 The following parts are required for camera mounting:
 
-- [\[Link to camera mount model on Printables/similar\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
+- [\[XY Nozzle Alignment Camera\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
 - OV9726 camera module
 
 
@@ -49,11 +49,12 @@ The install script will:
 2. Go to the Machine tab
 3. Find 'axiscope' in the services list
 4. Use the Start/Stop button to control the service
+<img style="padding-bottom: 10px;" src="media/ServiceControl.png" alt="Alt text" width="250"/><br/>
 ## Usage Guide
 
 ### Initial Setup
 
-1. Initial SetupAccess the web interface at `http://your-printer-ip:3000`
+1. Access the web interface at `http://your-printer-ip:3000`
 2. Select the printer address you are trying to calibrate, ( will most likely be autofiled soon )
 3. Select the camera to use
    1. Align `T0` perfectly center to the crosair
