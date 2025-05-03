@@ -191,4 +191,7 @@ sudo systemctl restart moonraker
 echo "Installation complete!"
 echo "AxisScope service has been enabled and started"
 echo "The service can be controlled through Mainsail's service control popup"
-echo "When running, it will be hosted at YourPrinterIP:3000"
+
+# Get and display the printer's IP address
+PRINTER_IP=$(hostname -I | awk '{print $1}')
+echo "When running, it will be hosted at http://${PRINTER_IP}:3000"
