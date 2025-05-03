@@ -130,3 +130,19 @@ echo "Installation complete!"
 echo "AxisScope service has been enabled and started"
 echo "The service can be controlled through Mainsail's Machine tab"
 echo "When running, it will be hosted at YourPrinterIP:3000"
+
+# Install Mainsail plugin
+echo "Installing Mainsail plugin..."
+MAINSAIL_PLUGINS_DIR="/usr/share/mainsail/plugins"
+
+# Create plugins directory if it doesn't exist
+if [ ! -d "${MAINSAIL_PLUGINS_DIR}" ]; then
+    echo "Creating Mainsail plugins directory..."
+    sudo mkdir -p "${MAINSAIL_PLUGINS_DIR}"
+fi
+
+# Copy plugin files
+echo "Copying AxisScope plugin to Mainsail..."
+sudo cp -r "${INSTALL_DIR}/mainsail-plugin" "${MAINSAIL_PLUGINS_DIR}/axiscope"
+
+echo "AxisScope plugin has been installed in Mainsail"
