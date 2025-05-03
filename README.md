@@ -8,7 +8,8 @@ AxisScope is a specialized tool designed to simplify the XY calibration process 
 - Quick and precise T0 - Tn alignment
 - No calculation required, It just does its magic and tell you the offset.
 
-<img src="media/axiscope.png" alt="Alt text" width="500"/>
+<br/>
+<img src="media/axiscope.png" alt="Alt text" width="500"/><br/>
 
 ## Hardware Requirements
 
@@ -49,7 +50,9 @@ The install script will:
 2. Go to the Machine tab
 3. Find 'axiscope' in the services list
 4. Use the Start/Stop button to control the service
+
 <img style="padding-bottom: 10px;" src="media/ServiceControl.png" alt="Alt text" width="250"/><br/>
+
 ## Usage Guide
 
 ### Initial Setup
