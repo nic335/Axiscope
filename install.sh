@@ -83,11 +83,31 @@ EOL
 echo "Installing service file..."
 sudo mv /tmp/axiscope.service /etc/systemd/system/
 
-
+# Copy service file
+echo "Installing AxisScope service..."
+sed -i "s/\$USER/${USER}/g; s/\$HOME/${HOME//\//\\/}/g" "${INSTALL_DIR}/axiscope.service"
+sudo cp "${INSTALL_DIR}/axiscope.service" /etc/systemd/system/
+sudo systemctl daemon-reload
 
 # Add to moonraker allowed services
 echo "Adding to moonraker.asvc..."
-echo "axiscope" >> ~/printer_data/moonraker.asvc
+ASVC_FILE="${HOME}/printer_data/moonraker.asvc"
+
+# Create file if it doesn't exist
+if [ ! -f "${ASVC_FILE}" ]; then
+    touch "${ASVC_FILE}"
+fi
+
+# Check if axiscope is already in the file
+if ! grep -q "^axiscope$" "${ASVC_FILE}"; then
+    # Ensure there's a newline at the end of file
+    [ -s "${ASVC_FILE}" ] && echo >> "${ASVC_FILE}"
+    # Add axiscope
+    echo "axiscope" >> "${ASVC_FILE}"
+    echo "Added axiscope to moonraker.asvc"
+else
+    echo "axiscope already in moonraker.asvc"
+fi
 
 # Add update manager configuration
 echo "Adding update manager configuration..."
@@ -119,8 +139,8 @@ sudo systemctl daemon-reload
 
 # Enable and start the service
 echo "Enabling and starting AxisScope service..."
-sudo systemctl enable axiscope.service
-sudo systemctl start axiscope.service
+# sudo systemctl enable axiscope.service
+# sudo systemctl start axiscope.service
 
 # Restart moonraker to recognize the new service
 echo "Restarting moonraker to recognize the new service..."
@@ -128,21 +148,5 @@ sudo systemctl restart moonraker
 
 echo "Installation complete!"
 echo "AxisScope service has been enabled and started"
-echo "The service can be controlled through Mainsail's Machine tab"
+echo "The service can be controlled through Mainsail's service control popup"
 echo "When running, it will be hosted at YourPrinterIP:3000"
-
-# Install Mainsail plugin
-echo "Installing Mainsail plugin..."
-MAINSAIL_PLUGINS_DIR="/usr/share/mainsail/plugins"
-
-# Create plugins directory if it doesn't exist
-if [ ! -d "${MAINSAIL_PLUGINS_DIR}" ]; then
-    echo "Creating Mainsail plugins directory..."
-    sudo mkdir -p "${MAINSAIL_PLUGINS_DIR}"
-fi
-
-# Copy plugin files
-echo "Copying AxisScope plugin to Mainsail..."
-sudo cp -r "${INSTALL_DIR}/mainsail-plugin" "${MAINSAIL_PLUGINS_DIR}/axiscope"
-
-echo "AxisScope plugin has been installed in Mainsail"
