@@ -1,32 +1,40 @@
 # AxisScope
 
-A tool alignment interface for Klipper-based 3D printers, designed to help with tool offset calibration in multi-tool setups.
+## What is AxisScope?
+
+AxisScope is a specialized tool designed to simplify the XY calibration process for multi-tool 3D printers using camera-assisted alignment. It provides a streamlined interface for:
+
+- Manual XY calibration using camera feedback
+- Quick and precise T0 center alignment
+- Easy tool position capture and comparison
+- Rapid switching between tools for offset calibration
+
+<img src="media/axiscope.png" alt="Alt text" width="500"/>
+
+## Hardware Requirements
+
+### 3D Printed Parts
+
+The following parts are required for camera mounting:
+
+- [\[Link to camera mount model on Printables/similar\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
+- OV9726 camera module
 
 
-#### Camera Mount
+## Installation
 
-- [XY Nozzle Alignment Camera Mount](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
-- USB extension cable (if needed)
+**Requirements:**
 
-### Print Settings
-- Layer Height: 0.2mm recommended
-- Infill: 40% or higher
-- Material: PETG or ABS recommended (due to potential heat exposure)
-- Supports: Required for camera mount overhangs
+- Klipper installed and running
+- Moonraker configured
+- SSH access to your printer
 
-### Assembly Instructions
 
-1. Print all parts from the [XY Nozzle Alignment Camera repository](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
-2. Follow the assembly guide provided in the Printables link
-3. Mount the USB camera securely in the printed housing
-4. Route the USB cable carefully to avoid interference with printer movement
 
-## Software Installation
-
-### Installation
+Quick installation using curl:
 
 ```bash
-curl -s https://raw.githubusercontent.com/nic335/Axiscope/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/nic335/Axiscope/dev/install.sh | bash
 ```
 
 The install script will:
@@ -42,42 +50,30 @@ The install script will:
 2. Go to the Machine tab
 3. Find 'axiscope' in the services list
 4. Use the Start/Stop button to control the service
-
-Once started, access the interface at `http://your-printer-ip:3000`
-
-**Requirements:**
-
-- Klipper installed and running
-- Moonraker configured
-- SSH access to your printer
+<img src="media/ServiceControl.png" alt="Alt text" width="500"/>
 
 ## Usage Guide
 
 ### Initial Setup
 
-1. Access the web interface at `http://your-printer-ip:3000`
-2. [Placeholder: Initial configuration steps]
-3. [Placeholder: Any calibration needed]
+1. Initial SetupAccess the web interface at `http://your-printer-ip:3000`
+2. Select the printer address you are trying to calibrate, ( will most likely be autofiled soon )
+3. Select the camera to use
+   1. Align `T0` perfectly center to the crosair
+   2. Capture Position
+   3. Change to `Tn`
+      1. Re-Align to center and press X and Y in the side navigator 
+      2. From there your new calculated offset should be 
 
-### Tool Alignment Process
-
-1. Home your printer
-2. [Placeholder: Step-by-step alignment process]
-3. [Placeholder: Tips for accurate alignment]
-
-### Features
-
-- Web-based interface
-- Real-time tool position visualization
-- Integration with Moonraker for updates
+<img style="padding-bottom: 10px;" src="media/axiscope.png" alt="Alt text" width="500"/><br/>
+<img style="padding-bottom: 10px;" src="media/saveOffset.png" alt="Alt text" width="500"/><br/>
+<img style="padding-bottom: 10px;" src="media/Calculated.png" alt="Alt text" width="500"/><br/>
 
 ## Integration with Mainsail
 
 AxisScope integrates directly with Mainsail:
 
 - Appears in update manager
-- Can be managed through Moonraker
-- Automatic startup with your printer
 
 ## License
 
