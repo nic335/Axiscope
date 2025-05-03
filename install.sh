@@ -55,7 +55,7 @@ source "${INSTALL_DIR}/${AXISCOPE_ENV}/bin/activate"
 # Install Python dependencies
 echo "Installing Python dependencies..."
 pip install --upgrade pip
-pip install flask  # We'll use Flask instead of simple HTTP server for better features
+pip install flask waitress  # Install Flask and Waitress WSGI server
 
 # Create the service file
 echo "Creating service file..."

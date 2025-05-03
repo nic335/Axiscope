@@ -7,9 +7,9 @@ StartLimitIntervalSec=0
 Type=simple
 User=$USER
 WorkingDirectory=$HOME/axiscope
-ExecStart=$HOME/axiscope/axiscope-env/bin/python3 -m flask run --host=0.0.0.0 --port=3000
+ExecStart=$HOME/axiscope/axiscope-env/bin/python3 app.py
 Environment="PATH=$HOME/axiscope/axiscope-env/bin"
-Environment="FLASK_APP=app.py"
+Environment="PYTHONUNBUFFERED=1"
 Restart=always
 RestartSec=1
 
