@@ -139,7 +139,7 @@ sudo systemctl daemon-reload
 
 # Enable and start the service
 echo "Enabling and starting AxisScope service..."
-# sudo systemctl enable axiscope.service
+sudo systemctl enable axiscope.service
 # sudo systemctl start axiscope.service
 
 # Restart moonraker to recognize the new service
