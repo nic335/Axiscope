@@ -40,17 +40,59 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-# Install python3-venv if not present
-if ! command -v python3 -m venv &> /dev/null; then
-    echo "Installing python3-venv..."
-    sudo apt-get update
-    sudo apt-get install -y python3-venv
+# Check for python3-venv
+echo "Checking for python3-venv..."
+if ! dpkg -l | grep -q python3-venv; then
+    echo "python3-venv not found. Installing..."
+    sudo apt-get update || {
+        echo "Failed to update package list"
+        exit 1
+    }
+    sudo apt-get install -y python3-venv || {
+        echo "Failed to install python3-venv"
+        exit 1
+    }
+    echo "python3-venv installed successfully"
+else
+    echo "python3-venv is already installed"
 fi
+
+# Verify python3 -m venv works
+echo "Verifying python3 venv functionality..."
+python3 -m venv --help > /dev/null 2>&1 || {
+    echo "Error: python3 venv module not working properly"
+    echo "Trying to fix by reinstalling..."
+    sudo apt-get install --reinstall python3-venv || {
+        echo "Failed to reinstall python3-venv"
+        exit 1
+    }
+}
 
 # Create and activate virtual environment
 echo "Setting up Python virtual environment..."
-python3 -m venv "${INSTALL_DIR}/${AXISCOPE_ENV}"
-source "${INSTALL_DIR}/${AXISCOPE_ENV}/bin/activate"
+python3 -m venv "${INSTALL_DIR}/${AXISCOPE_ENV}" || {
+    echo "Failed to create virtual environment"
+    echo "Python version: $(python3 --version)"
+    echo "Venv version: $(dpkg -l | grep python3-venv)"
+    exit 1
+}
+
+if [ ! -f "${INSTALL_DIR}/${AXISCOPE_ENV}/bin/activate" ]; then
+    echo "Virtual environment files not created properly"
+    exit 1
+fi
+
+echo "Activating virtual environment..."
+source "${INSTALL_DIR}/${AXISCOPE_ENV}/bin/activate" || {
+    echo "Failed to activate virtual environment"
+    exit 1
+}
+
+# Verify activation
+if [[ "$VIRTUAL_ENV" != "${INSTALL_DIR}/${AXISCOPE_ENV}" ]]; then
+    echo "Virtual environment not activated correctly"
+    exit 1
+fi
 
 # Install Python dependencies
 echo "Installing Python dependencies..."

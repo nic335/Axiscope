@@ -1,5 +1,6 @@
-from flask import Flask, send_from_directory
 import os
+from flask.app import Flask
+from flask.helpers import send_from_directory
 
 app = Flask(__name__)
 
