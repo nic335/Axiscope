@@ -1,12 +1,27 @@
 #!/bin/bash
 
+# Default values
 AXISCOPE_ENV="axiscope-env"
 INSTALL_DIR="$HOME/axiscope"
+REPO_URL="https://github.com/nic335/Axiscope.git"
+BRANCH="dev"
 
-# GitHub configuration
-REPO_URL="https://github.com/N3MI-DG/Axiscope.git"
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --branch)
+            BRANCH="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            exit 1
+            ;;
+    esac
+done
 
 echo "Installing AxisScope..."
+echo "Using branch: ${BRANCH}"
 
 # Check for existing installation
 if [ -d "${INSTALL_DIR}" ]; then
@@ -17,7 +32,7 @@ fi
 
 # Clone repository
 echo "Cloning AxisScope repository..."
-git clone ${REPO_URL} ${INSTALL_DIR}
+git clone -b ${BRANCH} ${REPO_URL} ${INSTALL_DIR}
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then 
@@ -81,11 +96,12 @@ if [ -f ~/printer_data/config/moonraker.conf ]; then
     if ! grep -q "\[update_manager axiscope\]" ~/printer_data/config/moonraker.conf; then
         cat >> ~/printer_data/config/moonraker.conf << EOL
 
+
 [update_manager axiscope]
 type: git_repo
 path: ${INSTALL_DIR}
 origin: ${REPO_URL}
-primary_branch: main
+primary_branch: ${BRANCH}
 is_system_service: True
 managed_services: axiscope
 EOL

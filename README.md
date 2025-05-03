@@ -9,7 +9,6 @@ A tool alignment interface for Klipper-based 3D printers, designed to help with 
 - USB extension cable (if needed)
 
 ### Print Settings
-
 - Layer Height: 0.2mm recommended
 - Infill: 40% or higher
 - Material: PETG or ABS recommended (due to potential heat exposure)
@@ -27,7 +26,7 @@ A tool alignment interface for Klipper-based 3D printers, designed to help with 
 ### Installation
 
 ```bash
-curl -s https://raw.githubusercontent.com/N3MI-DG/Axiscope/main/install.sh | bash
+curl -s https://raw.githubusercontent.com/nic335/Axiscope/main/install.sh | bash
 ```
 
 The install script will:
