@@ -113,11 +113,20 @@ else
     echo "Warning: moonraker.conf not found in expected location"
 fi
 
-# Reload systemd to recognize the new service
+# Reload systemd and enable the service
 echo "Reloading systemd..."
 sudo systemctl daemon-reload
 
+# Enable and start the service
+echo "Enabling and starting AxisScope service..."
+sudo systemctl enable axiscope.service
+sudo systemctl start axiscope.service
+
+# Restart moonraker to recognize the new service
+echo "Restarting moonraker to recognize the new service..."
+sudo systemctl restart moonraker
+
 echo "Installation complete!"
-echo "AxisScope service has been created but is not enabled or started"
+echo "AxisScope service has been enabled and started"
 echo "The service can be controlled through Mainsail's Machine tab"
 echo "When running, it will be hosted at YourPrinterIP:3000"
