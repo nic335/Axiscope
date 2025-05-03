@@ -101,7 +101,7 @@ pip install flask waitress  # Install Flask and Waitress WSGI server
 
 # Create the service file
 echo "Creating service file..."
-cat > /tmp/axiscope.service << EOLS
+cat > /tmp/axiscope.service << EOL
 [Unit]
 Description=AxisScope - Tool Alignment Interface for Klipper
 After=network.target moonraker.service
