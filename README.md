@@ -34,7 +34,7 @@ The following parts are required for camera mounting:
 Quick installation using curl:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/nic335/Axiscope/dev/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/nic335/Axiscope/install.sh | bash
 ```
 
 The install script will:
@@ -50,7 +50,7 @@ The install script will:
 2. Go to the Machine tab
 3. Find 'axiscope' in the services list
 4. Use the Start/Stop button to control the service
-<img src="media/ServiceControl.png" alt="Alt text" width="500"/>
+<img src="media/ServiceControl.png" alt="Alt text" width="250"/>
 
 ## Usage Guide
 
