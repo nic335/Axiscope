@@ -5,9 +5,8 @@
 AxisScope is a specialized tool designed to simplify the XY calibration process for multi-tool 3D printers using camera-assisted alignment. It provides a streamlined interface for:
 
 - Manual XY calibration using camera feedback
-- Quick and precise T0 center alignment
-- Easy tool position capture and comparison
-- Rapid switching between tools for offset calibration
+- Quick and precise T0 - Tn alignment
+- No calculation required, It just does its magic and tell you the offset.
 
 <img src="media/axiscope.png" alt="Alt text" width="500"/>
 
