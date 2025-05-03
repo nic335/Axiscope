@@ -1,0 +1,17 @@
+[Unit]
+Description=AxisScope - Tool Alignment Interface for Klipper
+After=network.target moonraker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$HOME/axiscope
+ExecStart=$HOME/axiscope/axiscope-env/bin/python3 -m flask run --host=0.0.0.0 --port=3000
+Environment="PATH=$HOME/axiscope/axiscope-env/bin"
+Environment="FLASK_APP=app.py"
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
