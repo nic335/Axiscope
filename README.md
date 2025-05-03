@@ -6,7 +6,6 @@ A tool alignment interface for Klipper-based 3D printers, designed to help with 
 #### Camera Mount
 
 - [XY Nozzle Alignment Camera Mount](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
-- M3 screws for assembly
 - USB extension cable (if needed)
 
 ### Print Settings

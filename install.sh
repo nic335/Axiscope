@@ -87,6 +87,7 @@ path: ${INSTALL_DIR}
 origin: ${REPO_URL}
 primary_branch: main
 is_system_service: True
+managed_services: axiscope
 EOL
         echo "Added update manager configuration to moonraker.conf"
     else
@@ -96,11 +97,11 @@ else
     echo "Warning: moonraker.conf not found in expected location"
 fi
 
-# Setup service
-echo "Setting up systemd service..."
+# Reload systemd to recognize the new service
+echo "Reloading systemd..."
 sudo systemctl daemon-reload
 
 echo "Installation complete!"
-echo "AxisScope can now be controlled through Mainsail's interface"
-echo "The service can be started/stopped using Mainsail's Machine tab"
-echo "It will be hosted at YourPrinterIP:3000"
+echo "AxisScope service has been created but is not enabled or started"
+echo "The service can be controlled through Mainsail's Machine tab"
+echo "When running, it will be hosted at YourPrinterIP:3000"
