@@ -21,7 +21,7 @@ sudo systemctl start axiscope
 ```ini
 [update_manager axiscope]
 type: git_repo
-path: ~/AxisScope
-origin: <YOUR_REPO_URL>
+path: ~/axiscope
+origin: https://github.com/N3MI-DG/Axiscope.git
 primary_branch: main
 is_system_service: True

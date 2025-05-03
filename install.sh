@@ -4,8 +4,7 @@ AXISCOPE_ENV="axiscope-env"
 INSTALL_DIR="$HOME/axiscope"
 
 # GitHub configuration
-# Using SSH URL format: git@github.com:owner/repo.git
-REPO_URL="git@github.com:NicolasRoyer/AxisScope.git"    # Replace with actual repository owner/name
+REPO_URL="https://github.com/N3MI-DG/Axiscope.git"
 
 echo "Installing AxisScope..."
 
@@ -45,7 +44,7 @@ pip install flask  # We'll use Flask instead of simple HTTP server for better fe
 
 # Create the service file
 echo "Creating service file..."
-sudo tee /etc/systemd/system/axiscope.service > /dev/null << EOL
+cat > /tmp/axiscope.service << EOL
 [Unit]
 Description=AxisScope - Tool Alignment Interface for Klipper
 After=network.target moonraker.service
@@ -54,9 +53,9 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=${INSTALL_DIR}
-ExecStart=${INSTALL_DIR}/${AXISCOPE_ENV}/bin/python3 -m flask run --host=0.0.0.0 --port=3000
-Environment="PATH=${INSTALL_DIR}/${AXISCOPE_ENV}/bin"
+WorkingDirectory=$HOME/axiscope
+ExecStart=$HOME/axiscope/axiscope-env/bin/python3 -m flask run --host=0.0.0.0 --port=3000
+Environment="PATH=$HOME/axiscope/axiscope-env/bin"
 Environment="FLASK_APP=app.py"
 Restart=always
 RestartSec=1
@@ -64,6 +63,11 @@ RestartSec=1
 [Install]
 WantedBy=multi-user.target
 EOL
+
+# Install service file
+echo "Installing service file..."
+sudo mv /tmp/axiscope.service /etc/systemd/system/
+
 
 
 # Add to moonraker allowed services
