@@ -8,20 +8,13 @@ function printerUrl(ip, endpoint) {
     return `http://${ip}${endpoint}`;
 }
 
-function isValidIP(ip) {
-    // Allow hostnames (including .local domains)
-    const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])*(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])*)*$/;
-    if (hostnameRegex.test(ip)) return true;
+function isValidIP(input) {
+    input = input.trim();
+    if (!input) return false;
     
-    // Check for IPv4
-    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    if (!ipRegex.test(ip)) return false;
-    
-    const parts = ip.split('.');
-    return parts.every(part => {
-        const num = parseInt(part, 10);
-        return num >= 0 && num <= 255;
-    });
+    // Simple regex to validate hostname/IP with optional port
+    const urlRegex = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9](:[0-9]+)?$/;
+    return urlRegex.test(input);
 }
 
 function updatePage() {
