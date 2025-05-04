@@ -214,6 +214,36 @@ function getTools() {
           $("#tool-list").append(nonZeroListItem({tool_number: tool_number, cx_offset: cx_offset, cy_offset: cy_offset, disabled: disabled, tc_disabled: tc_disabled}));
         }
       });
+      
+      // Set up copy handlers for all tools
+      tool_numbers.forEach(tool => {
+        ['x', 'y'].forEach(axis => {
+          $(`#T${tool}-${axis}-gcode`).off('click').on('click', function() {
+            const $this = $(this);
+            const originalText = $this.text();
+            const newOffset = $(`#T${tool}-${axis}-new`).find('>:first-child').text();
+            const gcodeCommand = `gcode_${axis}_offset: ${newOffset}`;
+            
+            // Create temporary textarea
+            const textarea = document.createElement('textarea');
+            textarea.value = gcodeCommand;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            
+            try {
+              textarea.select();
+              document.execCommand('copy');
+              $this.text('Copied!');
+              setTimeout(() => $this.text(originalText), 1000);
+            } catch (err) {
+              console.error('Failed to copy:', err);
+            } finally {
+              document.body.removeChild(textarea);
+            }
+          });
+        });
+      });
     });
 
     updateTools(tool_numbers, active_tool);
@@ -272,23 +302,8 @@ function updateOffset(tool, axis) {
     }
 
     const newOffsetText = new_offset.toFixed(3);
-    const gcodeCommand = `gcode_${axis}_offset: ${newOffsetText}`;
     
     // Update display
     $(`#T${tool}-${axis}-new`).find('>:first-child').text(newOffsetText);
-    $(`#T${tool}-${axis}-gcode`).attr('value', gcodeCommand);
-
-    // Add click handler for copying to clipboard
-    $(`#T${tool}-${axis}-gcode`).off('click').on('click', function() {
-      navigator.clipboard.writeText(gcodeCommand).then(() => {
-        // Visual feedback that it was copied
-        const $this = $(this);
-        const originalText = $this.text();
-        $this.text('Copied!');
-        setTimeout(() => $this.text(originalText), 1000);
-      }).catch(err => {
-        console.error('Failed to copy:', err);
-      });
-    });
   }
 }

@@ -66,9 +66,9 @@ The install script will:
       1. Re-Align to center and press X and Y in the side navigator 
       2. From there your new calculated offset should be 
 
-<img style="padding-bottom: 10px;" src="media/axiscope.png" alt="Alt text" width="500"/><br/>
-<img style="padding-bottom: 10px;" src="media/saveOffset.png" alt="Alt text" width="500"/><br/>
-<img style="padding-bottom: 10px;" src="media/Calculated.png" alt="Alt text" width="500"/><br/>
+<img style="padding-bottom: 10px;" src="media/T0-Aligment.gif" alt="Alt text" width="500"/><br/>
+<img style="padding-bottom: 10px;" src="media/CapturePosChangeT1.gif" alt="Alt text" width="500"/><br/>
+<img style="padding-bottom: 10px;" src="media/GrabOffset.gif" alt="Alt text" width="500"/><br/>
 
 ## Credits
 [Nic335](https://github.com/nic335) and [N3MI-DG](https://github.com/N3MI-DG)
