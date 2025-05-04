@@ -5,21 +5,21 @@ let path = '/webcam?action=stream';
 let updateInterval = null;
 
 function printerUrl(ip, endpoint) {
+    ip = ip.replace(/^https?:\/\//, '');
     return `http://${ip}${endpoint}`;
 }
 
 function isValidIP(input) {
     input = input.trim();
     if (!input) return false;
+
+    input = input.replace(/^https?:\/\//, '');
     
-    // Simple regex to validate hostname/IP with optional port
     const urlRegex = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9](:[0-9]+)?$/;
     return urlRegex.test(input);
 }
 
 function updatePage() {
-  // @TODO need to remove this hardcoding
-
   $.get(printerUrl(printerIp,"/printer/objects/query?gcode_move&toolhead&toolchanger&quad_gantry_level&stepper_enable"), function(data){
     // console.log(printerUrl)
     if (data['result']) {
@@ -170,7 +170,9 @@ $(document).ready(function() {
 
     // Handle save IP button click
     $('#saveIpBtn').on('click', function() {
-        const ip = $('#printerIp').val();
+        let ip = $('#printerIp').val();
+        // Strip http:// or https:// when saving the IP
+        ip = ip.replace(/^https?:\/\//, '');
         if (isValidIP(ip)) {
             console.log('Checking printer connection:', ip);
             
