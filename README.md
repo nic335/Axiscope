@@ -1,8 +1,8 @@
-# AxisScope
+# Axiscope
 
-## What is AxisScope?
+## What is Axiscope?
 
-AxisScope is a specialized tool designed to simplify the XY calibration process for multi-tool 3D printers using camera-assisted alignment. It provides a streamlined interface for:
+Axiscope is a specialized tool designed to simplify the XY calibration process for multi-tool 3D printers using camera-assisted alignment. It provides a streamlined interface for:
 
 - Manual XY calibration using camera feedback
 - Quick and precise T0 - Tn alignment
@@ -44,7 +44,7 @@ The install script will:
 - Set up the systemd service
 - Configure Moonraker integration
 
-### Starting AxisScope
+### Starting Axiscope
 
 1. Open your Mainsail interface
 2. Go to the Machine tab
