@@ -81,11 +81,7 @@ class Axiscope:
             self.probe_results[tool_no] = {'z_trigger': z_result, 'z_offset': 0}
 
         elif "0" in self.probe_results:
-            if z_result > self.probe_results["0"]['z_trigger']:
-                z_offset = -(self.probe_results["0"]['z_trigger'] - z_result)
-            
-            else:
-                z_offset = (self.probe_results["0"]['z_trigger'] - z_result)
+            z_offset = z_result - self.probe_results["0"]['z_trigger']
 
             self.probe_results[tool_no] = {
                 'z_trigger': z_result, 

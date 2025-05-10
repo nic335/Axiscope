@@ -53,6 +53,14 @@ const zeroListItem = ({tool_number, disabled, tc_disabled}) => `
               <span class="fs-5 lh-sm" id="captured-z" data-axis="z"><small></small></span>
             </div>
           </div>
+          <div class="row justify-content-center">
+            <div class="col-4">
+              <span class="fs-6 lh-sm"><small>Z-Trigger:</small></span>
+            </div>
+            <div class="col-6">
+              <span class="fs-5 lh-sm" id="T${tool_number}-z-trigger"><small>-</small></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -135,6 +143,14 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
               <span class="fs-6 lh-sm text-secondary"><small>Current Y</small></span>
               <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-y-offset"><small>${cy_offset}</small></span>
             </div>
+            <div class="row">
+              <span class="fs-6 lh-sm text-secondary"><small>Z-Trigger</small></span>
+              <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-trigger"><small>-</small></span>
+            </div>
+            <div class="row">
+              <span class="fs-6 lh-sm text-secondary"><small>Z-Offset</small></span>
+              <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-offset"><small>-</small></span>
+            </div>
           </div>
 
           <div class="col-6 pt-2 pb-2 getGcodes" toolId="${tool_number}">
@@ -174,6 +190,55 @@ function toolChangeURL(tool) {
   return url;
 }
 
+
+function getProbeResults() {
+  var url = printerUrl(printerIp, "/printer/objects/query?axiscope");
+  return $.get(url).then(function(data) {
+    if (data.result && data.result.status && data.result.status.axiscope && data.result.status.axiscope.probe_results) {
+      return data.result.status.axiscope.probe_results;
+    }
+    return {};
+  }).catch(function(error) {
+    console.error('Error fetching probe results:', error);
+    return {};
+  });
+}
+
+function updateProbeResults(tool_number, probeResults) {
+  if (probeResults[tool_number]) {
+    const result = probeResults[tool_number];
+    // Update Z-Trigger for all tools
+    $(`#T${tool_number}-z-trigger`).find('>:first-child').text(result.z_trigger.toFixed(3));
+    
+    // Update Z-Offset only for non-zero tools
+    if (tool_number !== '0' && tool_number !== 0) {
+      $(`#T${tool_number}-z-offset`).find('>:first-child').text(result.z_offset.toFixed(3));
+    }
+  }
+}
+
+// Start periodic probe results updates
+function startProbeResultsUpdates() {
+  // Update immediately
+  updateAllProbeResults();
+  
+  // Then update every 2 seconds
+  setInterval(updateAllProbeResults, 2000);
+}
+
+// Function to update all probe results
+function updateAllProbeResults() {
+  getProbeResults().then(function(probeResults) {
+    // Get all tool numbers from the page
+    const toolButtons = document.querySelectorAll('button[id="toolchange"]');
+    toolButtons.forEach(button => {
+      const toolNumber = button.getAttribute('data-tool');
+      if (toolNumber !== null) {
+        updateProbeResults(toolNumber, probeResults);
+      }
+    });
+  });
+}
 
 function getTools() {
   var url = printerUrl(printerIp, "/printer/objects/query?toolchanger")
@@ -247,6 +312,9 @@ function getTools() {
     });
 
     updateTools(tool_numbers, active_tool);
+    
+    // Start periodic updates after initial tool load
+    startProbeResultsUpdates();
   });
 }
 
