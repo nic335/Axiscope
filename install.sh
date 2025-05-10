@@ -4,7 +4,7 @@
 AXISCOPE_ENV="axiscope-env"
 INSTALL_DIR="$HOME/axiscope"
 REPO_URL="https://github.com/nic335/Axiscope.git"
-BRANCH="main"
+BRANCH="klippyExtrasStuff"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -140,6 +140,8 @@ if [ ! -f "${ASVC_FILE}" ]; then
     touch "${ASVC_FILE}"
 fi
 
+#@TODO: Add check for moonraker for the coords
+
 # Check if axiscope is already in the file
 if ! grep -q "^axiscope$" "${ASVC_FILE}"; then
     # Ensure there's a newline at the end of file
@@ -149,6 +151,35 @@ if ! grep -q "^axiscope$" "${ASVC_FILE}"; then
     echo "Added axiscope to moonraker.asvc"
 else
     echo "axiscope already in moonraker.asvc"
+fi
+
+# Check and add cors_domains entry
+echo "Checking cors_domains configuration..."
+if [ -f ~/printer_data/config/moonraker.conf ]; then
+    if grep -q "^cors_domains:" ~/printer_data/config/moonraker.conf; then
+        if ! grep -q "[[:space:]]*\*.local:\*" ~/printer_data/config/moonraker.conf; then
+            read -p "Would you like to add *.local:* to cors_domains? (Recommended if you plan to use hostname voron.local) (y/N) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "Adding *.local:* to cors_domains in moonraker.conf..."
+            # Find the last line of cors_domains section
+            line_num=$(grep -n "^cors_domains:" ~/printer_data/config/moonraker.conf | cut -d: -f1)
+            next_section=$(tail -n +$((line_num + 1)) ~/printer_data/config/moonraker.conf | grep -n "^\[.*\]" | head -1 | cut -d: -f1)
+            if [ -n "$next_section" ]; then
+                insert_line=$((line_num + next_section - 1))
+            else
+                insert_line=$(wc -l < ~/printer_data/config/moonraker.conf)
+            fi
+            # Insert the new entry before the next section or at the end of file
+            sed -i "${insert_line}i\    *.local:*" ~/printer_data/config/moonraker.conf
+                echo "Added *.local:* to cors_domains"
+            fi
+        else
+            echo "*.local:* already exists in cors_domains"
+        fi
+    else
+        echo "Warning: cors_domains section not found in moonraker.conf"
+    fi
 fi
 
 # Add update manager configuration
@@ -187,6 +218,11 @@ sudo systemctl enable axiscope.service
 # Restart moonraker to recognize the new service
 echo "Restarting moonraker to recognize the new service..."
 sudo systemctl restart moonraker
+
+# Add symlink of axiscope into klipper/klippy/extras and restart klipper
+echo "Adding symlink of axiscope into klipper/klippy/extras... and restarting klipper"
+sudo ln -s ${HOME}/axiscope/klippy/extras/axiscope.py ${HOME}/klipper/klippy/extras/axiscope.py
+sudo systemctl restart klipper
 
 echo "Installation complete!"
 echo "AxisScope service has been enabled and started"

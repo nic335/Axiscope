@@ -294,16 +294,31 @@ function updateOffset(tool, axis) {
     }
 
     var new_offset = (captured_pos-old_offset) - position;
+    
 
+    
+    // Modify new_offset for display
     if (new_offset < 0) {
       new_offset = Math.abs(new_offset);
     } else {
       new_offset = -new_offset;
     }
 
+    var offset_delta;
+    if(new_offset == old_offset){
+      offset_delta = 0;
+    }else{
+      // For delta: if new is more negative than old, it's negative delta
+      offset_delta = Math.abs(new_offset) > Math.abs(old_offset) ? 
+          -(Math.abs(new_offset) - Math.abs(old_offset)) : 
+          Math.abs(old_offset) - Math.abs(new_offset);
+    }
+
     const newOffsetText = new_offset.toFixed(3);
     
     // Update display
+    // id="T${tool_number}-x-offset"
+    $(`#T${tool}-${axis}-new`).attr('delta', offset_delta);
     $(`#T${tool}-${axis}-new`).find('>:first-child').text(newOffsetText);
   }
 }

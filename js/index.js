@@ -398,7 +398,7 @@ function initializePositionBars() {
         const $toolbar = $('<div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Movement Toolbar"></div>');
         const $btnGroup = $('<div class="btn-group btn-group-sm ps-5 pe-5" role="group"></div>');
 
-        [-0.01, -0.05, -0.1, -0.5].forEach(value => {
+        [-0.5, -0.1, -0.05, -0.01].forEach(value => {
             $('<button>', {
                 type: "button",
                 class: "btn btn-secondary border",
@@ -415,7 +415,7 @@ function initializePositionBars() {
             text: axis
         }).appendTo($btnGroup);
 
-        [0.5, 0.1, 0.05, 0.01].forEach(value => {
+        [0.01, 0.05, 0.1, 0.5].forEach(value => {
             $('<button>', {
                 type: "button",
                 class: "btn btn-secondary border",
