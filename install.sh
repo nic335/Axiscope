@@ -101,7 +101,8 @@ pip install flask waitress  # Install Flask and Waitress WSGI server
 
 # Create the service file
 echo "Creating service file..."
-cat > /tmp/axiscope.service << EOL
+SERVICE_FILE="${INSTALL_DIR}/axiscope.service"
+cat > "${SERVICE_FILE}" << EOL
 [Unit]
 Description=AxisScope - Tool Alignment Interface for Klipper
 After=network.target moonraker.service
@@ -109,10 +110,10 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=$USER
-WorkingDirectory=$HOME/axiscope
-ExecStart=$HOME/axiscope/axiscope-env/bin/python3 -m flask run --host=0.0.0.0 --port=3000
-Environment="PATH=$HOME/axiscope/axiscope-env/bin"
+User=${USER}
+WorkingDirectory=${HOME}/axiscope
+ExecStart=${HOME}/axiscope/axiscope-env/bin/python3 -m flask run --host=0.0.0.0 --port=3000
+Environment="PATH=${HOME}/axiscope/axiscope-env/bin"
 Environment="FLASK_APP=app.py"
 Restart=always
 RestartSec=1
@@ -121,14 +122,15 @@ RestartSec=1
 WantedBy=multi-user.target
 EOL
 
+# Verify service file was created correctly
+if [ ! -f "${SERVICE_FILE}" ]; then
+    echo "Failed to create service file"
+    exit 1
+fi
+
 # Install service file
 echo "Installing service file..."
-sudo mv /tmp/axiscope.service /etc/systemd/system/
-
-# Copy service file
-echo "Installing AxisScope service..."
-sed -i "s/\$USER/${USER}/g; s/\$HOME/${HOME//\//\\/}/g" "${INSTALL_DIR}/axiscope.service"
-sudo cp "${INSTALL_DIR}/axiscope.service" /etc/systemd/system/
+sudo cp "${SERVICE_FILE}" /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # Add to moonraker allowed services
@@ -154,24 +156,25 @@ else
 fi
 
 # Check and add cors_domains entry
-echo "Checking cors_domains configuration..."
-if [ -f ~/printer_data/config/moonraker.conf ]; then
-    if grep -q "^cors_domains:" ~/printer_data/config/moonraker.conf; then
-        if ! grep -q "[[:space:]]*\*.local:\*" ~/printer_data/config/moonraker.conf; then
+echo "Starting cors_domains check..."
+if [ -f "${HOME}/printer_data/config/moonraker.conf" ]; then
+    echo "Found moonraker.conf at ${HOME}/printer_data/config/moonraker.conf"
+    if grep -q "^cors_domains:" "${HOME}/printer_data/config/moonraker.conf"; then
+        if ! grep -q "[[:space:]]*\*.local:\*" "${HOME}/printer_data/config/moonraker.conf"; then
             read -p "Would you like to add *.local:* to cors_domains? (Recommended if you plan to use hostname voron.local) (y/N) " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 echo "Adding *.local:* to cors_domains in moonraker.conf..."
             # Find the last line of cors_domains section
-            line_num=$(grep -n "^cors_domains:" ~/printer_data/config/moonraker.conf | cut -d: -f1)
-            next_section=$(tail -n +$((line_num + 1)) ~/printer_data/config/moonraker.conf | grep -n "^\[.*\]" | head -1 | cut -d: -f1)
+            line_num=$(grep -n "^cors_domains:" "${HOME}/printer_data/config/moonraker.conf" | cut -d: -f1)
+            next_section=$(tail -n +$((line_num + 1)) "${HOME}/printer_data/config/moonraker.conf" | grep -n "^\[.*\]" | head -1 | cut -d: -f1)
             if [ -n "$next_section" ]; then
                 insert_line=$((line_num + next_section - 1))
             else
-                insert_line=$(wc -l < ~/printer_data/config/moonraker.conf)
+                insert_line=$(wc -l < "${HOME}/printer_data/config/moonraker.conf")
             fi
             # Insert the new entry before the next section or at the end of file
-            sed -i "${insert_line}i\    *.local:*" ~/printer_data/config/moonraker.conf
+            sed -i "${insert_line}i\    *.local:*" "${HOME}/printer_data/config/moonraker.conf"
                 echo "Added *.local:* to cors_domains"
             fi
         else
@@ -180,14 +183,17 @@ if [ -f ~/printer_data/config/moonraker.conf ]; then
     else
         echo "Warning: cors_domains section not found in moonraker.conf"
     fi
+else
+    echo "Error: moonraker.conf not found at ${HOME}/printer_data/config/moonraker.conf"
+    echo "Please make sure your printer configuration is in the correct location"
 fi
 
 # Add update manager configuration
 echo "Adding update manager configuration..."
-if [ -f ~/printer_data/config/moonraker.conf ]; then
+if [ -f "${HOME}/printer_data/config/moonraker.conf" ]; then
     # Check if the section already exists
-    if ! grep -q "\[update_manager axiscope\]" ~/printer_data/config/moonraker.conf; then
-        cat >> ~/printer_data/config/moonraker.conf << EOL
+    if ! grep -q "\[update_manager axiscope\]" "${HOME}/printer_data/config/moonraker.conf"; then
+        cat >> "${HOME}/printer_data/config/moonraker.conf" << EOL
 
 
 [update_manager axiscope]
