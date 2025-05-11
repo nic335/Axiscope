@@ -148,6 +148,90 @@ function ComandsUrl(axis, value) {
 }
 
 // Event handlers for printer modal
+// Macro management
+function saveMacro() {
+    const name = $('#macro-name').val().trim();
+    const command = $('#macro-command').val().trim();
+    
+    if (!name || !command) {
+        console.log('Both name and command are required');
+        return;
+    }
+    
+    // Get existing macros or initialize empty array
+    let macros = JSON.parse(localStorage.getItem('axiscope_macros') || '[]');
+    
+    // Add new macro
+    macros.push({ name, command });
+    
+    // Save to localStorage
+    localStorage.setItem('axiscope_macros', JSON.stringify(macros));
+    
+    // Clear inputs
+    $('#macro-name').val('');
+    $('#macro-command').val('');
+    
+    // Refresh macro list
+    loadMacros();
+}
+
+function loadMacros() {
+    const macros = JSON.parse(localStorage.getItem('axiscope_macros') || '[]');
+    const $macroList = $('#macro-list');
+    
+    // Clear current list
+    $macroList.empty();
+    
+    // Add each macro as a button
+    macros.forEach((macro, index) => {
+        const $item = $(`
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <button 
+                    type="button" 
+                    class="btn btn-sm btn-secondary flex-grow-1 me-2"
+                    onclick="executeMacro(${index})"
+                >
+                    ${macro.name}
+                </button>
+                <button 
+                    type="button" 
+                    class="btn btn-sm btn-danger"
+                    onclick="deleteMacro(${index})"
+                >
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `);
+        $macroList.append($item);
+    });
+}
+
+function executeMacro(index) {
+    const macros = JSON.parse(localStorage.getItem('axiscope_macros') || '[]');
+    const macro = macros[index];
+    
+    if (!macro) return;
+    
+    const url = printerUrl(printerIp, `/printer/gcode/script?script=${encodeURIComponent(macro.command)}`);
+    
+    $.get(url)
+        .done(function() {
+            console.log(`Executed macro: ${macro.name}`);
+        })
+        .fail(function(error) {
+            console.error(`Failed to execute macro: ${macro.name}`, error);
+        });
+}
+
+function deleteMacro(index) {
+    let macros = JSON.parse(localStorage.getItem('axiscope_macros') || '[]');
+    
+    macros.splice(index, 1);
+    localStorage.setItem('axiscope_macros', JSON.stringify(macros));
+    
+    loadMacros();
+}
+
 $(document).ready(function() {
     $("#ChangePrinter").click(function(){
         $('#printerModal').modal('show');
@@ -169,6 +253,19 @@ $(document).ready(function() {
     });
 
     // Handle save IP button click
+    // Initialize macro list
+    loadMacros();
+
+    // Macro save button handler
+    $('#save-macro').on('click', saveMacro);
+
+    // Allow saving macro with Enter key in command input
+    $('#macro-command').on('keypress', function(e) {
+        if (e.which === 13) { // Enter key
+            saveMacro();
+        }
+    });
+
     $('#saveIpBtn').on('click', function() {
         let ip = $('#printerIp').val();
         // Strip http:// or https:// when saving the IP

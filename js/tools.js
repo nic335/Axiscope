@@ -143,13 +143,15 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
               <span class="fs-6 lh-sm text-secondary"><small>Current Y</small></span>
               <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-y-offset"><small>${cy_offset}</small></span>
             </div>
-            <div class="row">
-              <span class="fs-6 lh-sm text-secondary"><small>Z-Trigger</small></span>
-              <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-trigger"><small>-</small></span>
-            </div>
-            <div class="row">
-              <span class="fs-6 lh-sm text-secondary"><small>Z-Offset</small></span>
-              <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-offset"><small>-</small></span>
+            <div class="z-fields d-none">
+              <div class="row">
+                <span class="fs-6 lh-sm text-secondary"><small>Z-Trigger</small></span>
+                <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-trigger"><small>-</small></span>
+              </div>
+              <div class="row">
+                <span class="fs-6 lh-sm text-secondary"><small>Z-Offset</small></span>
+                <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-offset"><small>-</small></span>
+              </div>
             </div>
           </div>
 
@@ -157,12 +159,20 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
             <div class="row pb-1">
               <span class="fs-6 lh-sm"><small>New X</small></span>
               <span class="fs-5 lh-sm" id="T${tool_number}-x-new"><small>0.0</small></span>
-              <button class="btn btn-link btn-sm p-0 text-decoration-none" id="T${tool_number}-x-gcode" axis="x" style="font-size: 0.8em;">Click to copy</button>
             </div>
-            <div class="row">
+            <div class="row pb-1">
               <span class="fs-6 lh-sm"><small>New Y</small></span>
               <span class="fs-5 lh-sm" id="T${tool_number}-y-new"><small>0.0</small></span>
-              <button class="btn btn-link btn-sm p-0 text-decoration-none" id="T${tool_number}-y-gcode" axis="y" style="font-size: 0.8em;">Click to copy</button>
+            </div>
+            <div class="row text-end">
+              <button 
+                class="btn btn-link btn-sm p-0" 
+                id="T${tool_number}-copy-all" 
+                title="Copy all offsets"
+              >
+              Copy
+                <i class="bi bi-clipboard-data fs-5"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -194,7 +204,18 @@ function toolChangeURL(tool) {
 function getProbeResults() {
   var url = printerUrl(printerIp, "/printer/objects/query?axiscope");
   return $.get(url).then(function(data) {
-    if (data.result && data.result.status && data.result.status.axiscope && data.result.status.axiscope.probe_results) {
+    const hasProbeResults = data.result?.status?.axiscope?.probe_results != null;
+    // Update calibration button state
+    const $calibrateBtn = $('#calibrate-all-btn');
+    if ($calibrateBtn.length) {
+      if (hasProbeResults) {
+        $calibrateBtn.removeClass('btn-secondary').addClass('btn-primary').prop('disabled', false);
+      } else {
+        $calibrateBtn.removeClass('btn-primary').addClass('btn-secondary').prop('disabled', true);
+      }
+    }
+    
+    if (hasProbeResults) {
       return data.result.status.axiscope.probe_results;
     }
     return {};
@@ -240,6 +261,42 @@ function updateAllProbeResults() {
   });
 }
 
+function calibrateButton(isEnabled = false) {
+  const buttonClass = isEnabled ? 'btn-primary' : 'btn-secondary';
+  const disabledAttr = isEnabled ? '' : 'disabled';
+  return `
+<li class="list-group-item bg-body-tertiary p-2">
+  <div class="container">
+    <div class="row">
+      <div class="col-12" >
+        <button 
+          type="button" 
+          class="btn btn-sm ${buttonClass} fs-6 border text-center h-100 w-100" 
+          style="padding-top:15px;" 
+          onclick="calibrateAllTools()"
+          ${disabledAttr}
+          id="calibrate-all-btn"
+        >
+          CALIBRATE ALL Z-OFFSETS
+        </button>
+      </div>
+    </div>
+  </div>
+</li>
+`;
+}
+
+function calibrateAllTools() {
+  const url = printerUrl(printerIp, "/printer/gcode/script?script=CALIBRATE_ALL_Z_OFFSETS");
+  $.get(url)
+    .done(function() {
+      console.log("Started Z-offset calibration");
+    })
+    .fail(function(error) {
+      console.error("Failed to start calibration:", error);
+    });
+}
+
 function getTools() {
   var url = printerUrl(printerIp, "/printer/objects/query?toolchanger")
   var tool_names;
@@ -279,19 +336,48 @@ function getTools() {
           $("#tool-list").append(nonZeroListItem({tool_number: tool_number, cx_offset: cx_offset, cy_offset: cy_offset, disabled: disabled, tc_disabled: tc_disabled}));
         }
       });
+
+      // Add calibration button after all tools
+      getProbeResults().then(results => {
+        const hasProbeResults = Object.keys(results).length > 0;
+        $("#tool-list").append(calibrateButton(hasProbeResults));
+      });
       
+      // Check if axiscope is available
+      $.get(printerUrl(printerIp, "/printer/objects/query?axiscope")).then(function(data) {
+        const hasProbeResults = data.result?.status?.axiscope?.probe_results != null;
+        if (hasProbeResults) {
+          $('.z-fields').removeClass('d-none');
+        }
+      }).catch(function(error) {
+        console.error('Error checking axiscope availability:', error);
+      });
+
       // Set up copy handlers for all tools
       tool_numbers.forEach(tool => {
-        ['x', 'y'].forEach(axis => {
-          $(`#T${tool}-${axis}-gcode`).off('click').on('click', function() {
-            const $this = $(this);
-            const originalText = $this.text();
-            const newOffset = $(`#T${tool}-${axis}-new`).find('>:first-child').text();
-            const gcodeCommand = `gcode_${axis}_offset: ${newOffset}`;
+        $(`#T${tool}-copy-all`).off('click').on('click', function() {
+          const $this = $(this);
+          const originalText = $this.text();
+          
+          // Get X/Y offsets
+          const xOffset = $(`#T${tool}-x-new`).find('>:first-child').text();
+          const yOffset = $(`#T${tool}-y-new`).find('>:first-child').text();
+          let gcodeCommands = [
+            `gcode_x_offset: ${xOffset}`,
+            `gcode_y_offset: ${yOffset}`
+          ];
+          
+          // Check if axiscope is available before including Z offset
+          $.get(printerUrl(printerIp, "/printer/objects/query?axiscope")).then(data => {
+            const hasProbeResults = data.result?.status?.axiscope?.probe_results != null;
+            if (hasProbeResults) {
+              const zOffset = $(`#T${tool}-z-offset`).find('>:first-child').text();
+              gcodeCommands.push(`gcode_z_offset: ${zOffset}`);
+            }
             
             // Create temporary textarea
             const textarea = document.createElement('textarea');
-            textarea.value = gcodeCommand;
+            textarea.value = gcodeCommands.join('\n');
             textarea.style.position = 'fixed';
             textarea.style.opacity = '0';
             document.body.appendChild(textarea);
@@ -299,13 +385,18 @@ function getTools() {
             try {
               textarea.select();
               document.execCommand('copy');
-              $this.text('Copied!');
-              setTimeout(() => $this.text(originalText), 1000);
+              const $icon = $this.find('i');
+              $icon.removeClass('bi-clipboard-data').addClass('bi-clipboard-check-fill text-success');
+              setTimeout(() => {
+                $icon.removeClass('bi-clipboard-check-fill text-success').addClass('bi-clipboard-data');
+              }, 1000);
             } catch (err) {
               console.error('Failed to copy:', err);
             } finally {
               document.body.removeChild(textarea);
             }
+          }).catch(error => {
+            console.error('Error checking axiscope availability:', error);
           });
         });
       });

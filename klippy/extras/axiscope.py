@@ -76,20 +76,24 @@ class Axiscope:
         tool_no   = str(self.toolchanger.active_tool.tool_number)
         start_pos = toolhead.get_position()
         z_result  = self.probe_multi_axis.run_probe("z-", gcmd, speed_ratio=0.5, max_distance=10.0, samples=self.samples)[2]
+        
+        self.reactor = self.printer.get_reactor()
+        measured_time = self.reactor.monotonic()
 
         if tool_no == "0":
-            self.probe_results[tool_no] = {'z_trigger': z_result, 'z_offset': 0}
+            self.probe_results[tool_no] = {'z_trigger': z_result, 'z_offset': 0, 'last_run': measured_time}
 
         elif "0" in self.probe_results:
             z_offset = z_result - self.probe_results["0"]['z_trigger']
 
             self.probe_results[tool_no] = {
                 'z_trigger': z_result, 
-                'z_offset': z_offset
+                'z_offset': z_offset,
+                'last_run': measured_time
             }
 
         else:
-            self.probe_results[tool_no] = {'z_trigger': z_result, 'z_offset': None}
+            self.probe_results[tool_no] = {'z_trigger': z_result, 'z_offset': None, 'last_run': measured_time}
 
 
         toolhead.move(start_pos, self.z_move_speed)
@@ -102,6 +106,7 @@ class Axiscope:
     cmd_CALIBRATE_ALL_Z_OFFSETS_help = "Probe the Z switch for each tool to determine offset."
 
     def cmd_CALIBRATE_ALL_Z_OFFSETS(self, gcmd):
+        
         if not self.is_homed():
             gcmd.respond_info('Must home first.')
             return
