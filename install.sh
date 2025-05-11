@@ -4,7 +4,7 @@
 AXISCOPE_ENV="axiscope-env"
 INSTALL_DIR="$HOME/axiscope"
 REPO_URL="https://github.com/nic335/Axiscope.git"
-BRANCH="klippyExtrasStuff"
+BRANCH="main"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
