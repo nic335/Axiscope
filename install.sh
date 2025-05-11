@@ -160,11 +160,18 @@ fi
 if [ -f "${HOME}/printer_data/config/moonraker.conf" ]; then
     echo "Checking for cors_domains entry..."
     if ! grep -F "*.local:*" "${HOME}/printer_data/config/moonraker.conf" >/dev/null; then
-        read -p "Add *.local:* to cors_domains? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ -t 0 ]; then
+            # Interactive mode
+            read -p "Add *.local:* to cors_domains? (y/N) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                sed -i '/cors_domains:/a\    *.local:*' "${HOME}/printer_data/config/moonraker.conf"
+                echo "Added *.local:* to cors_domains"
+            fi
+        else
+            # Non-interactive mode (curl pipe)
             sed -i '/cors_domains:/a\    *.local:*' "${HOME}/printer_data/config/moonraker.conf"
-            echo "Added *.local:* to cors_domains"
+            echo "Added *.local:* to cors_domains (non-interactive mode)"
         fi
     fi
 else
