@@ -156,20 +156,18 @@ else
     echo "axiscope already in moonraker.asvc"
 fi
 
-echo "Checking moonraker.conf..."
-if [ ! -f "${HOME}/printer_data/config/moonraker.conf" ]; then
-    echo "Error: moonraker.conf not found"
-else
-    echo "Found moonraker.conf"
-    # Check and add cors_domains entry
-    if ! grep -F "*.local:*" "${HOME}/printer_data/config/moonraker.conf" >/dev/null; then
-        read -p "Add *.local:* to cors_domains? (y/N) " -n 1 -r
+# Check and add cors_domains entry
+if [ -f "${HOME}/printer_data/config/moonraker.conf" ]; then
+    if ! tr -d '\r' < "${HOME}/printer_data/config/moonraker.conf" | grep -F "*.local" >/dev/null; then
+        read -p "Add *.local to cors_domains? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            sed -i '/cors_domains:/a\    *.local:*' "${HOME}/printer_data/config/moonraker.conf"
-            echo "Added *.local:* to cors_domains"
+            sed -i '/cors_domains:/a\    *.local' "${HOME}/printer_data/config/moonraker.conf"
+            echo "Added *.local to cors_domains"
         fi
     fi
+else
+    echo "Error: moonraker.conf not found"
 fi
 
 # Add update manager configuration
