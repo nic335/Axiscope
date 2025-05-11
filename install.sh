@@ -20,6 +20,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+cd ~
 echo "Installing AxisScope..."
 echo "Using branch: ${BRANCH}"
 
@@ -154,38 +155,18 @@ if ! grep -q "^axiscope$" "${ASVC_FILE}"; then
 else
     echo "axiscope already in moonraker.asvc"
 fi
-
 # Check and add cors_domains entry
-echo "Starting cors_domains check..."
-if [ -f "${HOME}/printer_data/config/moonraker.conf" ]; then
-    echo "Found moonraker.conf at ${HOME}/printer_data/config/moonraker.conf"
-    if grep -q "^cors_domains:" "${HOME}/printer_data/config/moonraker.conf"; then
-        if ! grep -q "[[:space:]]*\*.local:\*" "${HOME}/printer_data/config/moonraker.conf"; then
-            read -p "Would you like to add *.local:* to cors_domains? (Recommended if you plan to use hostname voron.local) (y/N) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                echo "Adding *.local:* to cors_domains in moonraker.conf..."
-            # Find the last line of cors_domains section
-            line_num=$(grep -n "^cors_domains:" "${HOME}/printer_data/config/moonraker.conf" | cut -d: -f1)
-            next_section=$(tail -n +$((line_num + 1)) "${HOME}/printer_data/config/moonraker.conf" | grep -n "^\[.*\]" | head -1 | cut -d: -f1)
-            if [ -n "$next_section" ]; then
-                insert_line=$((line_num + next_section - 1))
-            else
-                insert_line=$(wc -l < "${HOME}/printer_data/config/moonraker.conf")
-            fi
-            # Insert the new entry before the next section or at the end of file
-            sed -i "${insert_line}i\    *.local:*" "${HOME}/printer_data/config/moonraker.conf"
-                echo "Added *.local:* to cors_domains"
-            fi
-        else
-            echo "*.local:* already exists in cors_domains"
-        fi
-    else
-        echo "Warning: cors_domains section not found in moonraker.conf"
-    fi
+if [ ! -f "${HOME}/printer_data/config/moonraker.conf" ]; then
+    echo "Error: moonraker.conf not found"
 else
-    echo "Error: moonraker.conf not found at ${HOME}/printer_data/config/moonraker.conf"
-    echo "Please make sure your printer configuration is in the correct location"
+    if ! grep -q "[[:space:]]*\*.local:\*" "${HOME}/printer_data/config/moonraker.conf"; then
+        read -p "Add *.local:* to cors_domains? (y/N) " -n 1 -r
+        echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        grep -q "^\[cors_domains\]" "${HOME}/printer_data/config/moonraker.conf" || echo -e "\n[cors_domains]" >> "${HOME}/printer_data/config/moonraker.conf"
+        echo "  *.local:*" >> "${HOME}/printer_data/config/moonraker.conf"
+        echo "Added *.local:* to cors_domains"
+    fi
 fi
 
 # Add update manager configuration
