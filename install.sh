@@ -143,8 +143,6 @@ if [ ! -f "${ASVC_FILE}" ]; then
     touch "${ASVC_FILE}"
 fi
 
-#@TODO: Add check for moonraker for the coords
-
 # Check if axiscope is already in the file
 if ! grep -q "^axiscope$" "${ASVC_FILE}"; then
     # Ensure there's a newline at the end of file
@@ -154,28 +152,6 @@ if ! grep -q "^axiscope$" "${ASVC_FILE}"; then
     echo "Added axiscope to moonraker.asvc"
 else
     echo "axiscope already in moonraker.asvc"
-fi
-
-# Check and add cors_domains entry
-if [ -f "${HOME}/printer_data/config/moonraker.conf" ]; then
-    echo "Checking for cors_domains entry..."
-    if ! grep -F "*.local:*" "${HOME}/printer_data/config/moonraker.conf" >/dev/null; then
-        if [ -t 0 ]; then
-            # Interactive mode
-            read -p "Add *.local:* to cors_domains? (y/N) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                sed -i '/cors_domains:/a\    *.local:*' "${HOME}/printer_data/config/moonraker.conf"
-                echo "Added *.local:* to cors_domains"
-            fi
-        else
-            # Non-interactive mode (curl pipe)
-            sed -i '/cors_domains:/a\    *.local:*' "${HOME}/printer_data/config/moonraker.conf"
-            echo "Added *.local:* to cors_domains (non-interactive mode)"
-        fi
-    fi
-else
-    echo "Error: moonraker.conf not found"
 fi
 
 # Add update manager configuration
@@ -221,7 +197,7 @@ sudo ln -s ${HOME}/axiscope/klippy/extras/axiscope.py ${HOME}/klipper/klippy/ext
 sudo systemctl restart klipper
 
 echo "Installation complete!"
-echo "AxisScope service has been enabled and started"
+echo "AxisScope service has been enabled"
 echo "The service can be controlled through Mainsail's service control popup"
 
 # Get and display the printer's IP address

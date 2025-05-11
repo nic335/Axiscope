@@ -20,6 +20,12 @@ The following parts are required for camera mounting:
 - [\[XY Nozzle Alignment Camera\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
 - OV9726 camera module
 
+### Z Calibration Requirements (Optional)
+
+If you want to use automatic Z calibration:
+- An endstop switch mounted at a known position
+- Configuration added to your printer.cfg (see Configuration section)
+
 
 ## Installation
 
@@ -27,6 +33,7 @@ The following parts are required for camera mounting:
 
 - Klipper installed and running
 - Moonraker configured
+- camera setup and running in crownest
 - SSH access to your printer
 
 
@@ -52,6 +59,45 @@ The install script will:
 4. Use the Start/Stop button to control the service
 
 <img style="padding-bottom: 10px;" src="media/ServiceControl.png" alt="Alt text" width="250"/><br/>
+
+## Configuration
+
+If you want to use automatic Z calibration, add the following to your `printer.cfg`:
+
+```ini
+[axiscope]
+pin: !PG11                # Endstop pin
+zswitch_x_pos: 226.71     # REQUIRED - X position of the endstop switch
+zswitch_y_pos: -18.46     # REQUIRED - Y position of the endstop switch
+zswitch_z_pos: 7.8        # REQUIRED - Z position of the endstop switch
+lift_z: 1                 # OPTIONAL - Amount to lift Z before moving (default: 1)
+move_speed: 60            # OPTIONAL - XY movement speed in mm/s (default: 60)
+z_move_speed: 10          # OPTIONAL - Z movement speed in mm/s (default: 10)
+```
+If you plan on using hostname to connect to your printer, For example voron.local:3000, you will need to add the following to your moonraker.conf: `*.local:*`
+this should look like this
+
+```ini
+[authorization]
+trusted_clients:
+    192.168.0.0/16
+    10.0.0.0/8
+    127.0.0.0/8
+    169.254.0.0/16
+    172.16.0.0/12
+    192.168.0.0/16
+    FE80::/10
+    ::1/128
+cors_domains:
+    *.lan
+    *.local
+    *.local:*
+    *://localhost
+    *://localhost:*
+    *://my.mainsail.xyz
+    *://app.fluidd.xyz
+```
+
 
 ## Usage Guide
 
