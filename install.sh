@@ -162,7 +162,7 @@ if [ ! -f "${HOME}/printer_data/config/moonraker.conf" ]; then
 else
     echo "Found moonraker.conf"
     # Check and add cors_domains entry
-    if ! grep -F "    *.local:*" "${HOME}/printer_data/config/moonraker.conf" >/dev/null; then
+    if ! grep -F "*.local:*" "${HOME}/printer_data/config/moonraker.conf" >/dev/null; then
         read -p "Add *.local:* to cors_domains? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
