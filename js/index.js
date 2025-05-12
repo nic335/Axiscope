@@ -307,12 +307,19 @@ $(document).ready(function() {
                                     const snapshotUrl = streamUrl.replace('?action=stream', '?action=snapshot');
                                     
                                     const cameraOption = `
-                                        <div class="camera-option p-2" data-url="${streamUrl}">
+                                        <div class="camera-option p-2" 
+                                             data-url="${streamUrl}"
+                                             data-flip-h="${cam.flip_horizontal}"
+                                             data-flip-v="${cam.flip_vertical}"
+                                        >
                                             <div class="d-flex align-items-center">
                                                 <div class="me-3">
                                                     <img src="${snapshotUrl}" 
                                                          class="camera-preview"
                                                          alt="${cam.name}"
+                                                         data-flip-h="${cam.flip_horizontal}"
+                                                         data-flip-v="${cam.flip_vertical}"
+                                                    >
                                                 </div>
                                                 <div>
                                                     <h6 class="mb-0">${cam.name}</h6>
@@ -358,7 +365,7 @@ $(document).ready(function() {
     });
 
     // Camera selection handler
-    function connectCamera(selectedUrl) {
+    function connectCamera(selectedUrl, flipHorizontal, flipVertical) {
         // Stop any existing update interval
         if (updateInterval) {
             clearInterval(updateInterval);
@@ -372,8 +379,27 @@ $(document).ready(function() {
         printerIp = selectedIp; // Update the global variable
         WebcamPath = webcamPath;
         
-        // Update UI
-        $("#zoom-image").attr("src", printerUrl(printerIp, WebcamPath));
+        // Reset flip button states first
+        $('#flip-horizontal, #flip-vertical').removeClass('btn-primary').addClass('btn-secondary');
+        
+        // Update UI and set flip states
+        const $zoomImage = $("#zoom-image");
+        $zoomImage
+            .attr("src", printerUrl(printerIp, WebcamPath))
+            .data('flip-h', flipHorizontal)
+            .data('flip-v', flipVertical);
+            
+        // Set initial flip states for buttons and apply transformations
+        if (flipHorizontal) {
+            $('#flip-horizontal').removeClass('btn-secondary').addClass('btn-primary');
+            isFlippedHorizontal = true;
+        }
+        if (flipVertical) {
+            $('#flip-vertical').removeClass('btn-secondary').addClass('btn-primary');
+            isFlippedVertical = true;
+        }
+        // Apply the initial transform
+        updateTransform();
         
         // Initialize button URLs and data attributes
         $("#home-all")
@@ -412,11 +438,17 @@ $(document).ready(function() {
     // Camera selection click handler
     $(document).on('click', '.camera-option', function() {
         const selectedUrl = $(this).data('url');
+        const flipH = $(this).data('flip-h');
+        const flipV = $(this).data('flip-v');
+        
         if (selectedUrl) {
             console.log('Selected camera URL:', selectedUrl);
+            console.log('Flip settings - H:', flipH, 'V:', flipV);
+            
             // Update selection visual
             $('.camera-option').removeClass('selected');
             $(this).addClass('selected');
+            
             // Update button state
             $('#saveIpBtn')
                 .html('Connect to Camera')
@@ -425,7 +457,7 @@ $(document).ready(function() {
                 .addClass('btn-primary')
                 .off('click')
                 .on('click', function() {
-                    connectCamera(selectedUrl);
+                    connectCamera(selectedUrl, flipH, flipV);
                 });
         }
     });
