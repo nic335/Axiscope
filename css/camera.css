@@ -1,34 +1,48 @@
-#camContainer{
+#camContainer {
     position: relative;
     overflow: hidden;
-    margin-bottom: 20px;
-    margin: 0px !important;
-    padding: 0px !important;
-}
-#camContainer *{
-    margin: 0px !important;
-    padding: 0px !important;
-}
-.img-overlay-wrap {
-    /* position: relative; */
-    overflow: hidden;
-    display: inline-block; /* <= shrinks container to image size */
-    transition: transform 150ms ease-in-out;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 4/3;
 }
 
-.img-overlay-wrap img { /* <= optional, for responsiveness */
-    display: block;
-    max-width: 100%;
-    height: auto;
-    transition: transform 0.1s ease;
+#camContainer * {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.img-overlay-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.img-overlay-wrap img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    transition: filter 0.1s ease;
+    transition: transform 0.1s ease, filter 0.1s ease;
+    will-change: transform;
 }
 
 .img-overlay-wrap svg {
     position: absolute;
     top: 0;
     left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
 
