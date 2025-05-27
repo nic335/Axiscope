@@ -184,18 +184,43 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
 
 
 function toolChangeURL(tool) {
-  var x_pos = $("#captured-x").find(">:first-child").text();
-  var y_pos = $("#captured-y").find(">:first-child").text();
-  var z_pos = $("#captured-z").find(">:first-child").text();
-  var url = printerUrl(printerIp, "/printer/gcode/script?script=T" + tool)
+  var x_pos = $("#captured-x").find(":first-child").text();
+  var y_pos = $("#captured-y").find(":first-child").text();
+  var z_pos = $("#captured-z").find(":first-child").text();
 
-  if (x_pos != "") {
-    url = url + "%0ASAVE_GCODE_STATE NAME=RESTORE_POS"
-    url = url + "%0AG90";
-    url = url + "%0AG0 Z" + z_pos + " F3000";
-    url = url + "%0AG0 X" + x_pos + " Y" + y_pos + " F12000";
-    url = url + "%0ARESTORE_GCODE_STATE NAME=RESTORE_POS"
+  // Convert to numbers and validate
+  x_pos = parseFloat(x_pos);
+  y_pos = parseFloat(y_pos);
+  z_pos = parseFloat(z_pos);
+
+  // Check if we have valid numbers for all positions
+  if (isNaN(x_pos) || isNaN(y_pos) || isNaN(z_pos)) {
+    return printerUrl(printerIp, "/printer/gcode/script?script=T" + tool);
   }
+
+  // For T0, always use captured position without offsets
+  if (tool !== "0") {
+    // Get the position values directly from the inputs
+    var tool_x = parseFloat($("input[name=T"+tool+"-x-pos]").val()) || 0.0;
+    var tool_y = parseFloat($("input[name=T"+tool+"-y-pos]").val()) || 0.0;
+
+    if (tool_x !== 0.0 && tool_y !== 0.0) {
+      x_pos = tool_x;
+      y_pos = tool_y;
+    }
+  }
+  
+  // Format positions to 3 decimal places
+  x_pos = x_pos.toFixed(3);
+  y_pos = y_pos.toFixed(3);
+  z_pos = z_pos.toFixed(3);
+
+  var url = printerUrl(printerIp, "/printer/gcode/script?script=T" + tool);
+  url = url + "%0ASAVE_GCODE_STATE NAME=RESTORE_POS";
+  url = url + "%0AG90";
+  url = url + "%0AG0 Z" + z_pos + " F3000";
+  url = url + "%0AG0 X" + x_pos + " Y" + y_pos + " F12000";
+  url = url + "%0ARESTORE_GCODE_STATE NAME=RESTORE_POS";
 
   return url;
 }
@@ -441,43 +466,41 @@ function updateTools(tool_numbers, tn){
 
 
 function updateOffset(tool, axis) {
-  var captured_pos = $("#captured-"+axis).text();
+    var position = parseFloat($("input[name=T"+tool+"-"+axis+"-pos]").val()) || 0.0;
+    var captured_pos = $("#captured-"+axis).text();
 
-  if (captured_pos != "") {
-    captured_pos   = parseFloat(captured_pos);
-    var position   = parseFloat($("input[name=T"+tool+"-"+axis+"-pos]").val());
-    var old_offset = parseFloat($("#T"+tool+"-"+axis+"-offset").text());
+    // Only calculate new offset if this axis position is set and we have a captured position
+    if (position !== 0.0 && captured_pos !== "") {
+        captured_pos = parseFloat(captured_pos);
+        var old_offset = parseFloat($("#T"+tool+"-"+axis+"-offset").text());
 
-    if (isNaN(position)) {
-      position = 0.0;
-    }
+        var new_offset = (captured_pos-old_offset) - position;
+        
+        // Modify new_offset for display
+        if (new_offset < 0) {
+            new_offset = Math.abs(new_offset);
+        } else {
+            new_offset = -new_offset;
+        }
 
-    var new_offset = (captured_pos-old_offset) - position;
-    
+        var offset_delta;
+        if(new_offset == old_offset){
+            offset_delta = 0;
+        }else{
+            // For delta: if new is more negative than old, it's negative delta
+            offset_delta = Math.abs(new_offset) > Math.abs(old_offset) ? 
+                -(Math.abs(new_offset) - Math.abs(old_offset)) : 
+                Math.abs(old_offset) - Math.abs(new_offset);
+        }
 
-    
-    // Modify new_offset for display
-    if (new_offset < 0) {
-      new_offset = Math.abs(new_offset);
+        const newOffsetText = new_offset.toFixed(3);
+        
+        // Update display
+        $(`#T${tool}-${axis}-new`).attr('delta', offset_delta);
+        $(`#T${tool}-${axis}-new`).find('>:first-child').text(newOffsetText);
     } else {
-      new_offset = -new_offset;
+        // Reset to 0.0 if position is not set or no captured position
+        $(`#T${tool}-${axis}-new`).attr('delta', 0);
+        $(`#T${tool}-${axis}-new`).find('>:first-child').text('0.0');
     }
-
-    var offset_delta;
-    if(new_offset == old_offset){
-      offset_delta = 0;
-    }else{
-      // For delta: if new is more negative than old, it's negative delta
-      offset_delta = Math.abs(new_offset) > Math.abs(old_offset) ? 
-          -(Math.abs(new_offset) - Math.abs(old_offset)) : 
-          Math.abs(old_offset) - Math.abs(new_offset);
-    }
-
-    const newOffsetText = new_offset.toFixed(3);
-    
-    // Update display
-    // id="T${tool_number}-x-offset"
-    $(`#T${tool}-${axis}-new`).attr('delta', offset_delta);
-    $(`#T${tool}-${axis}-new`).find('>:first-child').text(newOffsetText);
-  }
 }
