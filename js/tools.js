@@ -150,7 +150,6 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
               </div>
               <div class="row">
                 <span class="fs-6 lh-sm text-secondary"><small>Z-Offset</small></span>
-                <span class="fs-5 lh-sm text-secondary" id="T${tool_number}-z-offset"><small>-</small></span>
               </div>
             </div>
           </div>
@@ -163,6 +162,10 @@ const nonZeroListItem = ({tool_number, cx_offset, cy_offset, disabled, tc_disabl
             <div class="row pb-1">
               <span class="fs-6 lh-sm"><small>New Y</small></span>
               <span class="fs-5 lh-sm" id="T${tool_number}-y-new"><small>0.0</small></span>
+            </div>
+            <div class="row pb-1">
+              <span class="fs-6 lh-sm"><small>New Z</small></span>
+              <span class="fs-5 lh-sm" id="T${tool_number}-z-new"><small>0.0</small></span>
             </div>
             <div class="row text-end">
               <button 
