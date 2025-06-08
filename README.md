@@ -74,6 +74,9 @@ lift_z: 1                 # OPTIONAL - Amount to lift Z before moving (default: 
 move_speed: 60            # OPTIONAL - XY movement speed in mm/s (default: 60)
 z_move_speed: 10          # OPTIONAL - Z movement speed in mm/s (default: 10)
 ```
+You will also have to find the location of the endstop, We recomend you to home and manually "jog" about 2mm over the endstop and look at what values you have for `x`,`y` and `z`
+
+
 If you plan on using hostname to connect to your printer, For example voron.local:3000, you will need to add the following to your moonraker.conf: `*.local:*`
 this should look like this
 
