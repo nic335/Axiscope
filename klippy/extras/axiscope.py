@@ -23,8 +23,10 @@ class Axiscope:
             tools_calibrate.ProbeEndstopWrapper(config, 'y'),
             tools_calibrate.ProbeEndstopWrapper(config, 'z')
         )
-        
+
         self.toolchanger = self.printer.load_object(config, 'toolchanger')
+        query_endstops = self.printer.load_object(config, 'query_endstops')
+        query_endstops.register_endstop(self.probe_multi_axis.mcu_probe[-1].mcu_endstop, "Axiscope")
 
         self.gcode.register_command('MOVE_TO_ZSWITCH', self.cmd_MOVE_TO_ZSWITCH, desc=self.cmd_MOVE_TO_ZSWITCH_help)
         self.gcode.register_command('PROBE_ZSWITCH',   self.cmd_PROBE_ZSWITCH, desc=self.cmd_PROBE_ZSWITCH_help)

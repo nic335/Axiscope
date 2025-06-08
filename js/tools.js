@@ -255,13 +255,13 @@ function getProbeResults() {
 
 function updateProbeResults(tool_number, probeResults) {
   if (probeResults[tool_number]) {
-    const result = probeResults[tool_number];
+  const result = probeResults[tool_number];
     // Update Z-Trigger for all tools
     $(`#T${tool_number}-z-trigger`).find('>:first-child').text(result.z_trigger.toFixed(3));
     
     // Update Z-Offset only for non-zero tools
     if (tool_number !== '0' && tool_number !== 0) {
-      $(`#T${tool_number}-z-offset`).find('>:first-child').text(result.z_offset.toFixed(3));
+      $(`#T${tool_number}-z-new`).find('>:first-child').text(result.z_offset.toFixed(3));
     }
   }
 }
@@ -399,8 +399,8 @@ function getTools() {
           $.get(printerUrl(printerIp, "/printer/objects/query?axiscope")).then(data => {
             const hasProbeResults = data.result?.status?.axiscope?.probe_results != null;
             if (hasProbeResults) {
-              const zOffset = $(`#T${tool}-z-offset`).find('>:first-child').text();
-              gcodeCommands.push(`gcode_z_offset: ${zOffset}`);
+              const zValue = $(`#T${tool}-z-new`).find('>:first-child').text();
+              gcodeCommands.push(`gcode_z_offset: ${zValue}`);
             }
             
             // Create temporary textarea
