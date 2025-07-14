@@ -13,12 +13,17 @@ Axiscope is a specialized tool designed to simplify the XY calibration process f
 
 ## Hardware Requirements
 
-### 3D Printed Parts
+### Camera Options
 
-The following parts are required for camera mounting:
+#### DIY Option
+The following parts are required if you want to build the camera yourself:
 
-- [\[XY Nozzle Alignment Camera\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera)
+- [\[XY Nozzle Alignment Camera\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera) - 3D printed parts
 - OV9726 camera module
+
+#### Pre-assembled Option
+A fully assembled camera with long USB cable can be purchased from:
+- [Ember Prototypes](https://www.emberprototypes.com/products/cxc)
 
 ### Z Calibration Requirements (Optional)
 
@@ -66,15 +71,52 @@ If you want to use automatic Z calibration, add the following to your `printer.c
 
 ```ini
 [axiscope]
-pin: !PG11                # Endstop pin
+pin: !PG15                # Endstop pin
 zswitch_x_pos: 226.71     # REQUIRED - X position of the endstop switch
 zswitch_y_pos: -18.46     # REQUIRED - Y position of the endstop switch
 zswitch_z_pos: 7.8        # REQUIRED - Z position of the endstop switch
 lift_z: 1                 # OPTIONAL - Amount to lift Z before moving (default: 1)
 move_speed: 60            # OPTIONAL - XY movement speed in mm/s (default: 60)
 z_move_speed: 10          # OPTIONAL - Z movement speed in mm/s (default: 10)
+start_gcode: M118 Starting calibration G28 -> QGL -> G28Z
+             G28
+             QUAD_GANTRY_LEVEL
+             G28 Z
+             #G0 X175 Y175 Z30 F3000   # Move to center @ focal length of camera Z=30
+before_pickup_gcode: M118 Something Could be Done here
+after_pickup_gcode: M118 NozzleScrub
+                    M109 S150
+                    #NOZZLE_SCRUBBER_MACRO
+finish_gcode: M118 Calibration complete
+              T0
 ```
-You will also have to find the location of the endstop, We recomend you to home and manually "jog" about 2mm over the endstop and look at what values you have for `x`,`y` and `z`
+
+### G-code Macro Options
+
+Axiscope now supports templated G-code macros with full Jinja template support.
+
+- **start_gcode**: Executed at the beginning of calibration
+- **before_pickup_gcode**: Executed before each tool change
+- **after_pickup_gcode**: Executed after each tool change
+- **finish_gcode**: Executed after calibration is complete
+
+
+### Finding the Endstop Position
+
+To correctly configure the endstop position for Z calibration:
+
+1. Home your printer and ensure T0 is selected
+2. Using the jog controls in your printer interface, carefully position the nozzle directly centered over the endstop pin
+3. Note the current X, Y, and Z positions displayed in your interface
+4. Use these values for `zswitch_x_pos` and `zswitch_y_pos` in your configuration
+5. For `zswitch_z_pos`, add 3mm to your current Z position (this provides clearance for probing uncalibrated nozzle)
+
+Example: If your position readings are X:226.71, Y:-18.46, Z:4.8, then configure:
+```
+zswitch_x_pos: 226.71
+zswitch_y_pos: -18.46
+zswitch_z_pos: 7.8  # 4.8 + 3mm clearance
+```
 
 
 If you plan on using hostname to connect to your printer, For example voron.local:3000, you will need to add the following to your moonraker.conf: `*.local:*`
@@ -118,6 +160,22 @@ cors_domains:
 <img style="padding-bottom: 10px;" src="media/T0-Aligment.gif" alt="Alt text" width="500"/><br/>
 <img style="padding-bottom: 10px;" src="media/CapturePosChangeT1.gif" alt="Alt text" width="500"/><br/>
 <img style="padding-bottom: 10px;" src="media/GrabOffset.gif" alt="Alt text" width="500"/><br/>
+
+## Troubleshooting FAQ
+
+### Error: Duplicate chip name 'probe_multi_axis'
+
+If you encounter this error when starting Klipper:
+
+<img src="media/duplicate_chip_error.png" alt="Duplicate chip name error" width="600"/><br/>
+
+**Problem:** You likely have both the toolchanger's `calibrate_offsets.cfg` and Axiscope configured in your printer.cfg. Both modules use the same 'probe_multi_axis' chip name.
+
+**Solution:** 
+1. Remove or comment out the inclusion of `calibrate_offsets.cfg` in your printer.cfg
+2. OR ensure you're only using one of these two calibration methods, not both
+
+Only Axiscope should be using the `probe_multi_axis` module when configured correctly.
 
 ## Credits
 [Nic335](https://github.com/nic335) and [N3MI-DG](https://github.com/N3MI-DG)

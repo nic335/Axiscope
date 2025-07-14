@@ -14,6 +14,15 @@ class Axiscope:
         self.move_speed    = config.getint('move_speed'  , 60)
         self.z_move_speed  = config.getint('z_move_speed', 10)
         self.samples       = config.getint('samples'     , 10)
+        
+        # Load gcode_macro module for template support
+        self.gcode_macro = self.printer.load_object(config, 'gcode_macro')
+        
+        # Custom gcode macros
+        self.start_gcode = self.gcode_macro.load_template(config, 'start_gcode', '')
+        self.before_pickup_gcode = self.gcode_macro.load_template(config, 'before_pickup_gcode', '')
+        self.after_pickup_gcode = self.gcode_macro.load_template(config, 'after_pickup_gcode', '')
+        self.finish_gcode = self.gcode_macro.load_template(config, 'finish_gcode', '')
 
         self.probe_results = {}
 
@@ -32,11 +41,29 @@ class Axiscope:
         self.gcode.register_command('PROBE_ZSWITCH',   self.cmd_PROBE_ZSWITCH, desc=self.cmd_PROBE_ZSWITCH_help)
         self.gcode.register_command('CALIBRATE_ALL_Z_OFFSETS',   self.cmd_CALIBRATE_ALL_Z_OFFSETS, desc=self.cmd_CALIBRATE_ALL_Z_OFFSETS_help)
 
+        self.gcode.register_command('AXISCOPE_START_GCODE', self.cmd_AXISCOPE_START_GCODE, desc="Execute the Axiscope start G-code macro")
+        self.gcode.register_command('AXISCOPE_BEFORE_PICKUP_GCODE', self.cmd_AXISCOPE_BEFORE_PICKUP_GCODE, desc="Execute the Axiscope before pickup G-code macro")
+        self.gcode.register_command('AXISCOPE_AFTER_PICKUP_GCODE', self.cmd_AXISCOPE_AFTER_PICKUP_GCODE, desc="Execute the Axiscope after pickup G-code macro")
+        self.gcode.register_command('AXISCOPE_FINISH_GCODE', self.cmd_AXISCOPE_FINISH_GCODE, desc="Execute the Axiscope finish G-code macro")
+
 
     def get_status(self, eventtime):
         return {
             'probe_results': self.probe_results,
         }
+        
+    def run_gcode(self, name, template, extra_context):
+        """Run gcode with template expansion and context"""
+        curtime = self.printer.get_reactor().monotonic()
+        context = {
+            **template.create_template_context(),
+            'tool': self.toolchanger.active_tool.get_status(
+                curtime) if self.toolchanger.active_tool else {},
+            'toolchanger': self.toolchanger.get_status(curtime),
+            'axiscope': self.get_status(curtime),
+            **extra_context,
+        }
+        template.run_gcode_from_command(context)
 
 
     def is_homed(self):
@@ -67,8 +94,14 @@ class Axiscope:
         toolhead = self.printer.lookup_object('toolhead')
         toolhead.wait_moves()
 
+        # Get current position
+        current_pos = toolhead.get_position()
+
+        # First move horizontally to the target X,Y at current Z height
+        toolhead.manual_move([self.x_pos, self.y_pos, current_pos[2]], self.move_speed)
+        
+        # Then move vertically to the target Z height
         toolhead.manual_move([None, None, self.z_pos+self.lift_z], self.z_move_speed)
-        toolhead.manual_move([self.x_pos, self.y_pos, None], self.move_speed)
 
 
     cmd_PROBE_ZSWITCH_help = "Probe the Z switch to determine offset."
@@ -112,9 +145,17 @@ class Axiscope:
         if not self.is_homed():
             gcmd.respond_info('Must home first.')
             return
+            
+        # Run start_gcode at the beginning of calibration
+        self.cmd_AXISCOPE_START_GCODE(gcmd)
 
         for tool_no in self.toolchanger.tool_numbers:
+            # Run before_pickup_gcode before tool change
+            self.cmd_AXISCOPE_BEFORE_PICKUP_GCODE(gcmd)
             self.gcode.run_script_from_command('T%i' % tool_no)
+            # Run after_pickup_gcode after tool change
+            self.cmd_AXISCOPE_AFTER_PICKUP_GCODE(gcmd)
+            
             self.gcode.run_script_from_command('MOVE_TO_ZSWITCH')
             self.gcode.run_script_from_command('PROBE_ZSWITCH SAMPLES=%i' % self.samples)
 
@@ -126,6 +167,38 @@ class Axiscope:
         for tool_no in self.probe_results:
             if tool_no != "0":
                 gcmd.respond_info('T%s gcode_z_offset: %.3f' % (tool_no, self.probe_results[tool_no]['z_offset']))
+        
+        # Run finish_gcode after calibration is complete
+        self.cmd_AXISCOPE_FINISH_GCODE(gcmd)
     
+    # Command handlers for custom macro G-code commands
+    def cmd_AXISCOPE_START_GCODE(self, gcmd):
+        """Execute the Axiscope start G-code macro"""
+        if self.start_gcode:
+            self.run_gcode('start_gcode', self.start_gcode, {})
+        else:
+            gcmd.respond_info("No start_gcode configured for Axiscope")
+
+    def cmd_AXISCOPE_BEFORE_PICKUP_GCODE(self, gcmd):
+        """Execute the Axiscope before pickup G-code macro"""
+        if self.before_pickup_gcode:
+            self.run_gcode('before_pickup_gcode', self.before_pickup_gcode, {})
+        else:
+            gcmd.respond_info("No before_pickup_gcode configured for Axiscope")
+
+    def cmd_AXISCOPE_AFTER_PICKUP_GCODE(self, gcmd):
+        """Execute the Axiscope after pickup G-code macro"""
+        if self.after_pickup_gcode:
+            self.run_gcode('after_pickup_gcode', self.after_pickup_gcode, {})
+        else:
+            gcmd.respond_info("No after_pickup_gcode configured for Axiscope")
+
+    def cmd_AXISCOPE_FINISH_GCODE(self, gcmd):
+        """Execute the Axiscope finish G-code macro"""
+        if self.finish_gcode:
+            self.run_gcode('finish_gcode', self.finish_gcode, {})
+        else:
+            gcmd.respond_info("No finish_gcode configured for Axiscope")
+
 def load_config(config):
     return Axiscope(config)

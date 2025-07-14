@@ -198,7 +198,11 @@ function toolChangeURL(tool) {
 
   // Check if we have valid numbers for all positions
   if (isNaN(x_pos) || isNaN(y_pos) || isNaN(z_pos)) {
-    return printerUrl(printerIp, "/printer/gcode/script?script=T" + tool);
+    // Even without positions, we still need the proper macro sequence
+    var url = printerUrl(printerIp, "/printer/gcode/script?script=AXISCOPE_BEFORE_PICKUP_GCODE");
+    url = url + "%0AT" + tool;
+    url = url + "%0AAXISCOPE_AFTER_PICKUP_GCODE";
+    return url;
   }
 
   // For T0, always use captured position without offsets
@@ -218,7 +222,16 @@ function toolChangeURL(tool) {
   y_pos = y_pos.toFixed(3);
   z_pos = z_pos.toFixed(3);
 
-  var url = printerUrl(printerIp, "/printer/gcode/script?script=T" + tool);
+  // Start with AXISCOPE_BEFORE_PICKUP_GCODE macro
+  var url = printerUrl(printerIp, "/printer/gcode/script?script=AXISCOPE_BEFORE_PICKUP_GCODE");
+  
+  // Perform the tool change
+  url = url + "%0AT" + tool;
+  
+  // Run AXISCOPE_AFTER_PICKUP_GCODE macro
+  url = url + "%0AAXISCOPE_AFTER_PICKUP_GCODE";
+  
+  // Add the movement commands
   url = url + "%0ASAVE_GCODE_STATE NAME=RESTORE_POS";
   url = url + "%0AG90";
   url = url + "%0AG0 Z" + z_pos + " F3000";
