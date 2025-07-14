@@ -74,7 +74,7 @@ If you want to use automatic Z calibration, add the following to your `printer.c
 pin: !PG15                # Endstop pin
 zswitch_x_pos: 226.71     # REQUIRED - X position of the endstop switch
 zswitch_y_pos: -18.46     # REQUIRED - Y position of the endstop switch
-zswitch_z_pos: 7.8        # REQUIRED - Z position of the endstop switch
+zswitch_z_pos: 7.8        # REQUIRED - Z position + some clearance of the endstop switch
 lift_z: 1                 # OPTIONAL - Amount to lift Z before moving (default: 1)
 move_speed: 60            # OPTIONAL - XY movement speed in mm/s (default: 60)
 z_move_speed: 10          # OPTIONAL - Z movement speed in mm/s (default: 10)
@@ -90,16 +90,6 @@ after_pickup_gcode: M118 NozzleScrub
 finish_gcode: M118 Calibration complete
               T0
 ```
-
-### G-code Macro Options
-
-Axiscope now supports templated G-code macros with full Jinja template support.
-
-- **start_gcode**: Executed at the beginning of calibration
-- **before_pickup_gcode**: Executed before each tool change
-- **after_pickup_gcode**: Executed after each tool change
-- **finish_gcode**: Executed after calibration is complete
-
 
 ### Finding the Endstop Position
 
@@ -117,6 +107,16 @@ zswitch_x_pos: 226.71
 zswitch_y_pos: -18.46
 zswitch_z_pos: 7.8  # 4.8 + 3mm clearance
 ```
+
+### G-code Macro Options
+
+Axiscope now supports templated G-code macros with full Jinja template support.
+
+- **start_gcode**: Executed at the beginning of calibration
+- **before_pickup_gcode**: Executed before each tool change
+- **after_pickup_gcode**: Executed after each tool change
+- **finish_gcode**: Executed after calibration is complete
+
 
 
 If you plan on using hostname to connect to your printer, For example voron.local:3000, you will need to add the following to your moonraker.conf: `*.local:*`
