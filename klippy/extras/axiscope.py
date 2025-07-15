@@ -1,4 +1,6 @@
 
+import os
+import ast
 from . import tools_calibrate
 from . import toolchanger
 
@@ -14,6 +16,9 @@ class Axiscope:
         self.move_speed    = config.getint('move_speed'  , 60)
         self.z_move_speed  = config.getint('z_move_speed', 10)
         self.samples       = config.getint('samples'     , 10)
+
+        self.pin              = config.get('pin'             , None)
+        self.config_file_path = config.get('config_file_path', None)
         
         # Load gcode_macro module for template support
         self.gcode_macro = self.printer.load_object(config, 'gcode_macro')
@@ -24,19 +29,27 @@ class Axiscope:
         self.after_pickup_gcode = self.gcode_macro.load_template(config, 'after_pickup_gcode', '')
         self.finish_gcode = self.gcode_macro.load_template(config, 'finish_gcode', '')
 
+        self.has_cfg_data     = False
         self.probe_results = {}
 
-        self.probe_multi_axis = tools_calibrate.PrinterProbeMultiAxis(
-            config, 
-            tools_calibrate.ProbeEndstopWrapper(config, 'x'),
-            tools_calibrate.ProbeEndstopWrapper(config, 'y'),
-            tools_calibrate.ProbeEndstopWrapper(config, 'z')
-        )
+        #setup endstop in query_endstops if pin is set
+        if self.pin is not None:
+            self.probe_multi_axis = tools_calibrate.PrinterProbeMultiAxis(
+                config, 
+                tools_calibrate.ProbeEndstopWrapper(config, 'x'),
+                tools_calibrate.ProbeEndstopWrapper(config, 'y'),
+                tools_calibrate.ProbeEndstopWrapper(config, 'z')
+            )
+            query_endstops = self.printer.load_object(config, 'query_endstops')
+            query_endstops.register_endstop(self.probe_multi_axis.mcu_probe[-1].mcu_endstop, "Axiscope")
+        else:
+            self.probe_multi_axis = None
 
         self.toolchanger = self.printer.load_object(config, 'toolchanger')
-        query_endstops = self.printer.load_object(config, 'query_endstops')
-        query_endstops.register_endstop(self.probe_multi_axis.mcu_probe[-1].mcu_endstop, "Axiscope")
 
+        self.printer.register_event_handler("klippy:connect", self.handle_connect)
+
+        #register gcode commands
         self.gcode.register_command('MOVE_TO_ZSWITCH', self.cmd_MOVE_TO_ZSWITCH, desc=self.cmd_MOVE_TO_ZSWITCH_help)
         self.gcode.register_command('PROBE_ZSWITCH',   self.cmd_PROBE_ZSWITCH, desc=self.cmd_PROBE_ZSWITCH_help)
         self.gcode.register_command('CALIBRATE_ALL_Z_OFFSETS',   self.cmd_CALIBRATE_ALL_Z_OFFSETS, desc=self.cmd_CALIBRATE_ALL_Z_OFFSETS_help)
@@ -45,11 +58,31 @@ class Axiscope:
         self.gcode.register_command('AXISCOPE_BEFORE_PICKUP_GCODE', self.cmd_AXISCOPE_BEFORE_PICKUP_GCODE, desc="Execute the Axiscope before pickup G-code macro")
         self.gcode.register_command('AXISCOPE_AFTER_PICKUP_GCODE', self.cmd_AXISCOPE_AFTER_PICKUP_GCODE, desc="Execute the Axiscope after pickup G-code macro")
         self.gcode.register_command('AXISCOPE_FINISH_GCODE', self.cmd_AXISCOPE_FINISH_GCODE, desc="Execute the Axiscope finish G-code macro")
+        self.gcode.register_command('AXISCOPE_SAVE_TOOL_OFFSET',          self.cmd_AXISCOPE_SAVE_TOOL_OFFSET,          desc=self.cmd_AXISCOPE_SAVE_TOOL_OFFSET_help)
+        self.gcode.register_command('AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS', self.cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS, desc=self.cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS_help)
+
+    def handle_connect(self):
+        if self.config_file_path is not None:
+            expanded_path = os.path.expanduser(self.config_file_path)
+            self.config_file_path = expanded_path
+            
+            if os.path.exists(self.config_file_path):
+                self.has_cfg_data = True
+                self.gcode.respond_info("Axiscope config file found (%s)." % self.config_file_path)
+                self.gcode.respond_info("--Axiscope Loaded--")
+            else:
+                self.gcode.respond_info("Could not find Axiscope config file (%s)" % self.config_file_path)
+                self.gcode.respond_info("Note: You can use ~ for home directory, e.g., ~/printer_data/config/axiscope.offsets")
+
+        else:
+            self.gcode.respond_info("Axiscope is missing config file location (config_file_path). You will need to update your tool offsets manually.")
+            self.gcode.respond_info("You can set config_file_path: ~/printer_data/config/axiscope.offsets in your [axiscope] section.")
 
 
     def get_status(self, eventtime):
         return {
-            'probe_results': self.probe_results,
+            'probe_results':   self.probe_results,
+            'can_save_config': self.has_cfg_data is not False
         }
         
     def run_gcode(self, name, template, extra_context):
@@ -77,6 +110,64 @@ class Axiscope:
     def has_switch_pos(self):
         return all(x is not None for x in [self.x_pos, self.y_pos, self.z_pos])
 
+    def update_tool_offsets(self, cfg_data, tool_name, offsets):
+        axis          = "xyz" if len(offsets) == 3 else "xy"
+        section_name  = "[%s]" % tool_name
+        section_start = None
+        section_end   = None
+        new_section   = None
+
+        for i, line in enumerate(cfg_data):
+            stripped_line = line.lstrip()
+            if stripped_line.startswith(section_name):
+                section_start = i+1
+            
+            elif section_start is not None:
+                if stripped_line.startswith('['):
+                    section_end = i-1
+                    break
+
+        for i, a in enumerate(axis):
+            offset_name   = "gcode_%s_offset" % a
+            offset_value  = offsets[i]
+            offset_string = "%s: %.3f\n" % (offset_name, offset_value)
+
+            if section_start is not None:
+                if section_end is not None:
+                    section_lines = cfg_data[section_start:section_end+1]
+                else:
+                    section_lines = cfg_data[section_start:]
+
+                for line in section_lines:
+                    stripped_line = line.lstrip()
+
+                    if stripped_line.startswith(offset_name):
+                        cfg_index = cfg_data.index(line)
+                        cfg_data[cfg_index] = offset_string
+
+            else:
+                if new_section is not None:
+                    new_section.append(offset_string)
+                else:
+                    new_section = ["\n", section_name+"\n", offset_string]
+
+        if new_section is not None:
+            new_section.append("\n")
+            no_touch_index = None
+
+            if self.config_file_path.endswith('printer.cfg'):
+                for line in cfg_data:
+                    if line.lstrip().startswith('#*#'):
+                        no_touch_index = cfg_data.index(line)
+                        break
+
+            if no_touch_index is not None:
+                cfg_data = cfg_data[:no_touch_index] + ["\n"] + new_section + cfg_data[no_touch_index:]
+
+            else:
+                cfg_data = cfg_data + ["\n"] + new_section
+        
+        return cfg_data
 
     cmd_MOVE_TO_ZSWITCH_help = "Move the toolhead over the Z switch"
 
@@ -199,6 +290,82 @@ class Axiscope:
             self.run_gcode('finish_gcode', self.finish_gcode, {})
         else:
             gcmd.respond_info("No finish_gcode configured for Axiscope")
+
+    cmd_AXISCOPE_SAVE_TOOL_OFFSET_help = "Save a tool offset to your axiscope config file."
+    
+    def cmd_AXISCOPE_SAVE_TOOL_OFFSET(self, gcmd):
+        """
+        This function saves the tool offsets for the specified tool.
+
+        Usage
+        -----
+        `AXISCOPE_SAVE_TOOL_OFFSET TOOL_NAME=<tool_name> OFFSETS=<offsets>`
+
+        Example
+        -----
+        ```
+        AXISCOPE_SAVE_TOOL_OFFSET TOOL_NAME="tool T0" OFFSETS="[-0.01, 0.03, 0.01]"
+        ```
+        """
+        if self.has_cfg_data is not False:
+            with open(self.config_file_path, 'r') as f:
+                cfg_data = f.readlines()
+
+            tool_name = gcmd.get('TOOL_NAME')
+            offsets   = ast.literal_eval(gcmd.get('OFFSETS'))
+
+            out_data = self.update_tool_offsets(cfg_data, tool_name, offsets)
+            gcmd.respond_info("Writing %s offsets." % tool_name)
+
+            with open(self.config_file_path, 'w') as f:
+                for line in out_data:
+                    f.write(line)
+
+                f.close()
+                gcmd.respond_info("Offsets written successfully.")
+
+        else:
+            gcmd.respond_info("Axiscope needs a valid config location (config_file_path) to save tool offsets.")
+
+
+    cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS_help = "Save multiple tool offsets to your axiscope config file."
+
+    def cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS(self, gcmd):
+        """
+        This function saves the offsets for multiple tools'.
+
+        Usage
+        -----
+        `AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS TOOLS=<tools> OFFSETS=<offsets>`
+
+        Example
+        -----
+        ```
+        AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS TOOLS="['tool T0', 'tool T1']" OFFSETS="[[-0.01, 0.03, 0.01], [0.02, 0.02, -0.06]]"
+        ```
+        """
+        if self.has_cfg_data is not False:
+            with open(self.config_file_path, 'r') as f:
+                cfg_data = f.readlines()
+
+            tool_names = gcmd.get('TOOLS')
+            offsets    = ast.literal_eval(gcmd.get('OFFSETS'))
+            out_data   = cfg_data
+
+            for i, tool_name in enumerate(tool_names):
+                out_data = self.update_tool_offsets(cfg_data, tool_name, offsets[i])
+
+            gcmd.respond_info("Writing %s offsets." % tool_name)
+
+            with open(self.config_file_path, 'w') as f:
+                for line in out_data:
+                    f.write(line)
+
+                f.close()
+                gcmd.respond_info("Offsets written successfully.")
+
+        else:
+            gcmd.respond_info("Axiscope needs a valid config location (config_file_path) to save tool offsets.")
 
 def load_config(config):
     return Axiscope(config)
