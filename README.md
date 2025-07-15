@@ -59,9 +59,8 @@ The install script will:
 ### Starting Axiscope
 
 1. Open your Mainsail interface
-2. Go to the Machine tab
-3. Find 'axiscope' in the services list
-4. Use the Start/Stop button to control the service
+2. Find 'axiscope' in the services list under "Klipper/Service/Host Control"
+3. Use the Start/Stop button to control the service
 
 <img style="padding-bottom: 10px;" src="media/ServiceControl.png" alt="Alt text" width="250"/><br/>
 
@@ -95,8 +94,8 @@ finish_gcode: M118 Calibration complete
 
 To correctly configure the endstop position for Z calibration:
 
-1. Home your printer and ensure T0 is selected
-2. Using the jog controls in your printer interface, carefully position the nozzle directly centered over the endstop pin
+1. Home your printer with T0 selected
+2. Using the jog controls in your printer interface, carefully position the nozzle directly centered over the endstop pin (not touching but close)
 3. Note the current X, Y, and Z positions displayed in your interface
 4. Use these values for `zswitch_x_pos` and `zswitch_y_pos` in your configuration
 5. For `zswitch_z_pos`, add 3mm to your current Z position (this provides clearance for probing uncalibrated nozzle)
