@@ -8,7 +8,8 @@ class Axiscope:
     def __init__(self, config):
         self.printer       = config.get_printer()
         self.gcode         = self.printer.lookup_object('gcode')
-    
+        self.gcode_move = self.printer.load_object(config, 'gcode_move')
+
         self.x_pos         = config.getfloat('zswitch_x_pos', None)
         self.y_pos         = config.getfloat('zswitch_y_pos', None)
         self.z_pos         = config.getfloat('zswitch_z_pos', None)
@@ -189,8 +190,9 @@ class Axiscope:
         current_pos = toolhead.get_position()
 
         # First move horizontally to the target X,Y at current Z height
-        toolhead.manual_move([self.x_pos, self.y_pos, current_pos[2]], self.move_speed)
-        
+        #toolhead.manual_move([self.x_pos, self.y_pos, current_pos[2]], self.move_speed)
+        self.gcode_move.cmd_G1(self.gcode.create_gcode_command("G0", "G0", { 'X': self.x_pos, 'Y': self.y_pos, 'Z': current_pos[2], 'F': self.move_speed*60 }))
+
         # Then move vertically to the target Z height
         toolhead.manual_move([None, None, self.z_pos+self.lift_z], self.z_move_speed)
 
