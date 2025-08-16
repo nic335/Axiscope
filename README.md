@@ -20,6 +20,7 @@ The following parts are required if you want to build the camera yourself:
 
 - [\[XY Nozzle Alignment Camera\]](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera) - 3D printed parts
 - OV9726 camera module
+- 5V 3mm round white6000-6500k LEDS x 4
 
 #### Pre-assembled Option
 A fully assembled camera with long USB cable can be purchased from:
