@@ -96,10 +96,10 @@ finish_gcode: M118 Calibration complete
 To correctly configure the endstop position for Z calibration:
 
 1. Home your printer with T0 selected
-2. Using the jog controls in your printer interface, carefully position the nozzle directly centered over the endstop pin (not touching but close)
+2. Using the jog controls in your printer interface, carefully position the nozzle directly centered over the endstop pin
 3. Note the current X, Y, and Z positions displayed in your interface
 4. Use these values for `zswitch_x_pos` and `zswitch_y_pos` in your configuration
-5. For `zswitch_z_pos`, add 3mm to your current Z position (this provides clearance for probing uncalibrated nozzle)
+5. For `zswitch_z_pos`, add 3mm to your current Z position (If using multiple hotends of varying lengths, add additional clearance as needed.)
 
 Example: If your position readings are X:226.71, Y:-18.46, Z:4.8, then configure:
 ```
