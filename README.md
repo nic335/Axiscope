@@ -40,7 +40,7 @@ If you want to use automatic Z calibration:
 - Klipper installed and running
 - [Klipper Tool Changer](https://github.com/viesturz/klipper-toolchanger)
 - Moonraker configured
-- camera setup and running in crownest
+- Camera setup in Crowsnest & Mainsail
 - SSH access to your printer
 
 
