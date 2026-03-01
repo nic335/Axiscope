@@ -61,6 +61,7 @@ class Axiscope:
         self.gcode.register_command('AXISCOPE_FINISH_GCODE', self.cmd_AXISCOPE_FINISH_GCODE, desc="Execute the Axiscope finish G-code macro")
         self.gcode.register_command('AXISCOPE_SAVE_TOOL_OFFSET',          self.cmd_AXISCOPE_SAVE_TOOL_OFFSET,          desc=self.cmd_AXISCOPE_SAVE_TOOL_OFFSET_help)
         self.gcode.register_command('AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS', self.cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS, desc=self.cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS_help)
+        self.gcode.register_command('AXISCOPE_SET_ENDSTOP_POSITION', self.cmd_AXISCOPE_SET_ENDSTOP_POSITION, desc=self.cmd_AXISCOPE_SET_ENDSTOP_POSITION_help)
 
     def handle_connect(self):
         if self.config_file_path is not None:
@@ -368,6 +369,67 @@ class Axiscope:
 
         else:
             gcmd.respond_info("Axiscope needs a valid config location (config_file_path) to save tool offsets.")
+
+    cmd_AXISCOPE_SET_ENDSTOP_POSITION_help = "Set kinematic position for X, Y, and/or Z axes"
+    
+    def cmd_AXISCOPE_SET_ENDSTOP_POSITION(self, gcmd):
+        """
+        Set axiscope endstop positions for specified axes. Can receive X, Y, and/or Z optionally.
+        
+        Usage
+        -----
+        AXISCOPE_SET_ENDSTOP_POSITION [X=<x_pos>] [Y=<y_pos>] [Z=<z_pos>] [CURRENT=<1|0>]
+        
+        Examples
+        --------
+        AXISCOPE_SET_ENDSTOP_POSITION X=150.0          # Set only X endstop position
+        AXISCOPE_SET_ENDSTOP_POSITION Y=200.0          # Set only Y endstop position  
+        AXISCOPE_SET_ENDSTOP_POSITION Z=0.0            # Set only Z endstop position
+        AXISCOPE_SET_ENDSTOP_POSITION X=150.0 Y=200.0  # Set X and Y endstop positions
+        AXISCOPE_SET_ENDSTOP_POSITION X=150.0 Y=200.0 Z=0.0  # Set all endstop positions
+        AXISCOPE_SET_ENDSTOP_POSITION CURRENT=1        # Set all positions to current position
+        AXISCOPE_SET_ENDSTOP_POSITION X=150.0 CURRENT=1  # Set X to 150.0, Y and Z to current
+        """
+        # Get current position
+        toolhead = self.printer.lookup_object('toolhead')
+        current_pos = toolhead.get_position()
+        
+        # Check if CURRENT parameter is set
+        use_current = gcmd.get_int('CURRENT', 0)
+        
+        # Get optional parameters
+        x_pos = gcmd.get_float('X', None)
+        y_pos = gcmd.get_float('Y', None) 
+        z_pos = gcmd.get_float('Z', None)
+        
+        # If CURRENT=1, use current position for unspecified axes
+        if use_current:
+            if x_pos is None:
+                x_pos = current_pos[0]
+            if y_pos is None:
+                y_pos = current_pos[1]
+            if z_pos is None:
+                z_pos = current_pos[2]
+        
+        # Update axiscope's internal position variables
+        set_axes = []
+        if x_pos is not None:
+            self.x_pos = x_pos
+            set_axes.append(f"X={x_pos:.3f}")
+        if y_pos is not None:
+            self.y_pos = y_pos
+            set_axes.append(f"Y={y_pos:.3f}")
+        if z_pos is not None:
+            self.z_pos = z_pos
+            set_axes.append(f"Z={z_pos:.3f}")
+            
+        if set_axes:
+            if use_current:
+                gcmd.respond_info(f"Set axiscope endstop positions (using current): {' '.join(set_axes)}")
+            else:
+                gcmd.respond_info(f"Set axiscope endstop positions: {' '.join(set_axes)}")
+        else:
+            gcmd.respond_info("No axes specified. Use X=, Y=, Z=, and/or CURRENT=1 parameters.")
 
 def load_config(config):
     return Axiscope(config)
