@@ -237,6 +237,10 @@ $(document).ready(function() {
         $('#printerModal').modal('show');
     });
 
+    // Pre-populate the printer IP with current host (without port)
+    const currentHost = window.location.hostname;
+    $('#printerIp').val(currentHost);
+
     // Initialize printer modal
     $('#printerModal').modal('show');
 
