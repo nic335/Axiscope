@@ -48,21 +48,32 @@ function updatePage() {
 }
 
 function updateBedMap(axiscope, axis_min, axis_max, gcode_pos) {
-    if (!axiscope || !axis_min || !axis_max) return;
+    if (!axiscope || !axis_min || !axis_max) {
+        $('#endstop-section').hide();
+        return;
+    }
+    $('#endstop-section').show();
 
-    const svg     = document.getElementById('bed-map-svg');
+    const svg = document.getElementById('bed-map-svg');
     if (!svg) return;
 
-    const pad     = 20;
-    const W       = svg.clientWidth  || 220;
-    const H       = svg.clientHeight || 220;
-    const drawW   = W - pad * 2;
-    const drawH   = H - pad * 2;
+    const pad    = 24;
+    const maxDim = 200; // max pixels for the longer axis
 
     const minX = axis_min[0], maxX = axis_max[0];
     const minY = axis_min[1], maxY = axis_max[1];
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
+
+    // Scale so the longer axis = maxDim, shorter axis scales proportionally
+    const scale  = maxDim / Math.max(rangeX, rangeY);
+    const W      = Math.round(rangeX * scale) + pad * 2;
+    const H      = Math.round(rangeY * scale) + pad * 2;
+    const drawW  = W - pad * 2;
+    const drawH  = H - pad * 2;
+
+    svg.setAttribute('width',  W);
+    svg.setAttribute('height', H);
 
     // Map a printer coordinate to SVG space (Y axis flipped)
     function toSVG(px, py) {

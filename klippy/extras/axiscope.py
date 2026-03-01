@@ -84,10 +84,7 @@ class Axiscope:
     def get_status(self, eventtime):
         return {
             'probe_results':   self.probe_results,
-            'can_save_config': self.has_cfg_data is not False,
-            'endstop_x':       self.x_pos,
-            'endstop_y':       self.y_pos,
-            'endstop_z':       self.z_pos,
+            'can_save_config': self.has_cfg_data is not False
         }
         
     def run_gcode(self, name, template, extra_context):

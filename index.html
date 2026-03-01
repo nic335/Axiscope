@@ -175,14 +175,6 @@
                             <li class="list-group-item"><span>Z: </span><span id="pos-z">0.0</span></li>
                         </ul>
                         </div>
-                        <div class="row justify-content-center pb-1">
-                            <svg id="bed-map-svg" width="240" height="200" style="display:block;margin:auto;"></svg>
-                            <div class="d-flex justify-content-center gap-3 pt-1" style="font-size:11px;">
-                                <span><svg width="10" height="10"><line x1="0" y1="5" x2="10" y2="5" stroke="#22c55e" stroke-width="1.5"/><line x1="5" y1="0" x2="5" y2="10" stroke="#22c55e" stroke-width="1.5"/></svg> Z-switch</span>
-                                <span><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#3b82f6" fill-opacity="0.8"/></svg> Nozzle</span>
-                            </div>
-                        </div>
-                    
                         <div class="row">
                         <div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Homing Toolbar">
                             <div class="btn-group btn-group-sm ps-5 pe-5 pb-1" role="group" aria-label="">
@@ -192,17 +184,24 @@
                             </div>
                         </div>
                         </div>
-                        <div class="row">
-                        <div class="btn-toolbar justify-content-center pt-2" role="toolbar" aria-label="Position Toolbar">
-                            <div class="btn-group btn-group-sm" role="group" aria-label="">
-                            <button type="button" class="btn btn-success border" id="set-endstop-position" title="Set current position as axiscope endstop position">
-                                <i class="bi bi-crosshair2"></i> Set Endstop Position
-                            </button>
-                            </div>
-                        </div>
-                        </div>
                         <div id="BouncePositionBar"></div>
                         <div id="BigPositionBar"></div>
+                        <!-- Endstop Position Section -->
+                        <div id="endstop-section" class="mt-2 mb-1 border-top border-secondary pt-2" style="display:none;">
+                            <div class="d-flex align-items-center justify-content-between px-2 pb-1">
+                                <small class="text-secondary fw-semibold text-uppercase" style="font-size:10px;letter-spacing:0.05em;">Z Endstop Position</small>
+                                <button type="button" class="btn btn-success btn-sm" id="set-endstop-position" title="Set current position as axiscope endstop position">
+                                    <i class="bi bi-crosshair2"></i> Set Current Position
+                                </button>
+                            </div>
+                            <div class="d-flex justify-content-center">
+                                <svg id="bed-map-svg" style="display:block;"></svg>
+                            </div>
+                            <div class="d-flex justify-content-center gap-3 pt-1" style="font-size:10px;color:#888;">
+                                <span><svg width="10" height="10"><line x1="0" y1="5" x2="10" y2="5" stroke="#22c55e" stroke-width="1.5"/><line x1="5" y1="0" x2="5" y2="10" stroke="#22c55e" stroke-width="1.5"/></svg> Z-switch</span>
+                                <span><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#3b82f6" fill-opacity="0.8"/></svg> Nozzle</span>
+                            </div>
+                        </div>
                     </div>
                     <!-- -------------------------- positioning ------------------- -->
                 </div>
