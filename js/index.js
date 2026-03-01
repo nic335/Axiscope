@@ -20,7 +20,7 @@ function isValidIP(input) {
 }
 
 function updatePage() {
-  $.get(printerUrl(printerIp,"/printer/objects/query?gcode_move&toolhead&toolchanger&quad_gantry_level&stepper_enable"), function(data){
+  $.get(printerUrl(printerIp,"/printer/objects/query?gcode_move&toolhead&toolchanger&quad_gantry_level&stepper_enable&axiscope"), function(data){
     // console.log(printerUrl)
     if (data['result']) {
 
@@ -33,13 +33,128 @@ function updatePage() {
       var tool_number = data['result']['status']['toolchanger']['tool_number'];
       var tools       = data['result']['status']['toolchanger']['tool_numbers'];
 
+      var axis_min    = data['result']['status']['toolhead']['axis_minimum'];
+      var axis_max    = data['result']['status']['toolhead']['axis_maximum'];
+      var axiscope    = data['result']['status']['axiscope'];
+
       updatePositions(positions, gcode_pos);
       updateHoming(homed);
       updateQGL(qgl_done);
       updateMotor(checkActiveStepper(steppers));
       updateTools(tools, tool_number);
+      updateBedMap(axiscope, axis_min, axis_max, gcode_pos);
     }
   });
+}
+
+function updateBedMap(axiscope, axis_min, axis_max, gcode_pos) {
+    if (!axiscope || !axis_min || !axis_max) {
+        $('#endstop-section').hide();
+        return;
+    }
+    $('#endstop-section').show();
+
+    const svg = document.getElementById('bed-map-svg');
+    if (!svg) return;
+
+    const pad    = 24;
+    const maxDim = 200; // max pixels for the longer axis
+
+    const minX = axis_min[0], maxX = axis_max[0];
+    const minY = axis_min[1], maxY = axis_max[1];
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+
+    // Scale so the longer axis = maxDim, shorter axis scales proportionally
+    const scale  = maxDim / Math.max(rangeX, rangeY);
+    const W      = Math.round(rangeX * scale) + pad * 2;
+    const H      = Math.round(rangeY * scale) + pad * 2;
+    const drawW  = W - pad * 2;
+    const drawH  = H - pad * 2;
+
+    svg.setAttribute('width',  W);
+    svg.setAttribute('height', H);
+
+    // Map a printer coordinate to SVG space (Y axis flipped)
+    function toSVG(px, py) {
+        return [
+            pad + ((px - minX) / rangeX) * drawW,
+            pad + ((maxY - py) / rangeY) * drawH
+        ];
+    }
+
+    // Clear and redraw
+    svg.innerHTML = '';
+
+    // Bed boundary
+    const [bx1, by1] = toSVG(minX, maxY);
+    const [bx2, by2] = toSVG(maxX, minY);
+    const bedRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bedRect.setAttribute('x', bx1);
+    bedRect.setAttribute('y', by1);
+    bedRect.setAttribute('width', bx2 - bx1);
+    bedRect.setAttribute('height', by2 - by1);
+    bedRect.setAttribute('fill', 'none');
+    bedRect.setAttribute('stroke', '#555');
+    bedRect.setAttribute('stroke-width', '1');
+    svg.appendChild(bedRect);
+
+    // Corner labels
+    function addLabel(text, x, y, anchor) {
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t.setAttribute('x', x); t.setAttribute('y', y);
+        t.setAttribute('text-anchor', anchor);
+        t.setAttribute('font-size', '8');
+        t.setAttribute('fill', '#888');
+        t.textContent = text;
+        svg.appendChild(t);
+    }
+    addLabel(`${minX},${maxY}`, bx1 + 2,  by1 + 10, 'start');
+    addLabel(`${maxX},${maxY}`, bx2 - 2,  by1 + 10, 'end');
+    addLabel(`${minX},${minY}`, bx1 + 2,  by2 - 3,  'start');
+    addLabel(`${maxX},${minY}`, bx2 - 2,  by2 - 3,  'end');
+
+    // Endstop position marker (green crosshair)
+    if (axiscope.endstop_x !== null && axiscope.endstop_y !== null) {
+        const [ex, ey] = toSVG(axiscope.endstop_x, axiscope.endstop_y);
+        const r = 5;
+
+        const hLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        hLine.setAttribute('x1', ex - r); hLine.setAttribute('y1', ey);
+        hLine.setAttribute('x2', ex + r); hLine.setAttribute('y2', ey);
+        hLine.setAttribute('stroke', '#22c55e'); hLine.setAttribute('stroke-width', '1.5');
+        svg.appendChild(hLine);
+
+        const vLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        vLine.setAttribute('x1', ex); vLine.setAttribute('y1', ey - r);
+        vLine.setAttribute('x2', ex); vLine.setAttribute('y2', ey + r);
+        vLine.setAttribute('stroke', '#22c55e'); vLine.setAttribute('stroke-width', '1.5');
+        svg.appendChild(vLine);
+
+        const endLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        endLabel.setAttribute('x', ex + 6); endLabel.setAttribute('y', ey - 4);
+        endLabel.setAttribute('font-size', '8'); endLabel.setAttribute('fill', '#22c55e');
+        endLabel.textContent = `Z-switch (${axiscope.endstop_x.toFixed(1)}, ${axiscope.endstop_y.toFixed(1)})`;
+        svg.appendChild(endLabel);
+    }
+
+    // Current nozzle position marker (blue dot)
+    if (gcode_pos) {
+        const [cx, cy] = toSVG(gcode_pos[0], gcode_pos[1]);
+
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', cx); dot.setAttribute('cy', cy);
+        dot.setAttribute('r', '4');
+        dot.setAttribute('fill', '#3b82f6');
+        dot.setAttribute('fill-opacity', '0.8');
+        svg.appendChild(dot);
+
+        const posLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        posLabel.setAttribute('x', cx + 6); posLabel.setAttribute('y', cy + 4);
+        posLabel.setAttribute('font-size', '8'); posLabel.setAttribute('fill', '#3b82f6');
+        posLabel.textContent = `(${gcode_pos[0].toFixed(1)}, ${gcode_pos[1].toFixed(1)})`;
+        svg.appendChild(posLabel);
+    }
 }
 
 function updatePositions(positions, gcode_pos){
@@ -268,6 +383,39 @@ $(document).ready(function() {
         if (e.which === 13) { // Enter key
             saveMacro();
         }
+    });
+
+    // Set endstop position button handler
+    $('#set-endstop-position').on('click', function() {
+        const url = printerUrl(printerIp, '/printer/gcode/script?script=' + encodeURIComponent('AXISCOPE_SET_ENDSTOP_POSITION CURRENT=1'));
+        
+        $.get(url)
+            .done(function() {
+                console.log('Set endstop position to current location');
+                // Show success feedback
+                const button = $('#set-endstop-position');
+                const originalText = button.html();
+                button.html('<i class="bi bi-check-circle"></i> Position Set!');
+                button.removeClass('btn-success').addClass('btn-outline-success');
+                
+                setTimeout(function() {
+                    button.html(originalText);
+                    button.removeClass('btn-outline-success').addClass('btn-success');
+                }, 2000);
+            })
+            .fail(function(error) {
+                console.error('Failed to set endstop position:', error);
+                // Show error feedback
+                const button = $('#set-endstop-position');
+                const originalText = button.html();
+                button.html('<i class="bi bi-x-circle"></i> Failed');
+                button.removeClass('btn-success').addClass('btn-danger');
+                
+                setTimeout(function() {
+                    button.html(originalText);
+                    button.removeClass('btn-danger').addClass('btn-success');
+                }, 2000);
+            });
     });
 
     $('#saveIpBtn').on('click', function() {
