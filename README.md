@@ -79,17 +79,21 @@ zswitch_z_pos: 7.8        # REQUIRED - Z position + some clearance of the endsto
 lift_z: 1                 # OPTIONAL - Amount to lift Z before moving (default: 1)
 move_speed: 60            # OPTIONAL - XY movement speed in mm/s (default: 60)
 z_move_speed: 10          # OPTIONAL - Z movement speed in mm/s (default: 10)
-start_gcode: M118 Starting calibration G28 -> QGL -> G28Z
-             G28
-             QUAD_GANTRY_LEVEL
-             G28 Z
-             #G0 X175 Y175 Z30 F3000   # Move to center @ focal length of camera Z=30
-before_pickup_gcode: M118 Something Could be Done here
-after_pickup_gcode: M118 NozzleScrub
-                    M109 S150
-                    #NOZZLE_SCRUBBER_MACRO
+start_gcode: 
+  {% set tools = printer.toolchanger.tool_numbers %}
+  {% for tool in tools %}
+      M104 T{tool} S150
+  {% endfor %}
+before_pickup_gcode: M118 pickup_gcode
+after_pickup_gcode: M118 after_pickup_gcode
+                    # NOZZLE_SCRUBBER_W
 finish_gcode: M118 Calibration complete
-              T0
+  {% set tools = printer.toolchanger.tool_numbers %}
+  {% for tool in tools %}
+      M104 T{tool} S0
+  {% endfor %}
+  T0
+
 ```
 
 ### Finding the Endstop Position
