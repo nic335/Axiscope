@@ -270,6 +270,39 @@ $(document).ready(function() {
         }
     });
 
+    // Set endstop position button handler
+    $('#set-endstop-position').on('click', function() {
+        const url = printerUrl(printerIp, '/printer/gcode/script?script=' + encodeURIComponent('AXISCOPE_SET_ENDSTOP_POSITION CURRENT=1'));
+        
+        $.get(url)
+            .done(function() {
+                console.log('Set endstop position to current location');
+                // Show success feedback
+                const button = $('#set-endstop-position');
+                const originalText = button.html();
+                button.html('<i class="bi bi-check-circle"></i> Position Set!');
+                button.removeClass('btn-success').addClass('btn-outline-success');
+                
+                setTimeout(function() {
+                    button.html(originalText);
+                    button.removeClass('btn-outline-success').addClass('btn-success');
+                }, 2000);
+            })
+            .fail(function(error) {
+                console.error('Failed to set endstop position:', error);
+                // Show error feedback
+                const button = $('#set-endstop-position');
+                const originalText = button.html();
+                button.html('<i class="bi bi-x-circle"></i> Failed');
+                button.removeClass('btn-success').addClass('btn-danger');
+                
+                setTimeout(function() {
+                    button.html(originalText);
+                    button.removeClass('btn-danger').addClass('btn-success');
+                }, 2000);
+            });
+    });
+
     $('#saveIpBtn').on('click', function() {
         let ip = $('#printerIp').val();
         // Strip http:// or https:// when saving the IP
