@@ -61,6 +61,7 @@ class Axiscope:
         self.gcode.register_command('AXISCOPE_FINISH_GCODE', self.cmd_AXISCOPE_FINISH_GCODE, desc="Execute the Axiscope finish G-code macro")
         self.gcode.register_command('AXISCOPE_SAVE_TOOL_OFFSET',          self.cmd_AXISCOPE_SAVE_TOOL_OFFSET,          desc=self.cmd_AXISCOPE_SAVE_TOOL_OFFSET_help)
         self.gcode.register_command('AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS', self.cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS, desc=self.cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS_help)
+        self.gcode.register_command('AXISCOPE_APPLY_LIVE_OFFSET',         self.cmd_AXISCOPE_APPLY_LIVE_OFFSET,         desc=self.cmd_AXISCOPE_APPLY_LIVE_OFFSET_help)
         self.gcode.register_command('AXISCOPE_SET_ENDSTOP_POSITION', self.cmd_AXISCOPE_SET_ENDSTOP_POSITION, desc=self.cmd_AXISCOPE_SET_ENDSTOP_POSITION_help)
 
     def handle_connect(self):
@@ -333,6 +334,49 @@ class Axiscope:
         else:
             gcmd.respond_info("Axiscope needs a valid config location (config_file_path) to save tool offsets.")
 
+
+    cmd_AXISCOPE_APPLY_LIVE_OFFSET_help = "Apply tool offsets live without saving to config"
+    
+    def cmd_AXISCOPE_APPLY_LIVE_OFFSET(self, gcmd):
+        """
+        Apply tool offsets to the active tool immediately without saving to config.
+        This allows testing offset values before committing them.
+        
+        Usage
+        -----
+        `AXISCOPE_APPLY_LIVE_OFFSET TOOL_NAME=<tool_name> OFFSETS=<offsets>`
+        
+        Example
+        -----
+        ```
+        AXISCOPE_APPLY_LIVE_OFFSET TOOL_NAME="tool 1" OFFSETS="[-0.01, 0.03, 0.01]"
+        ```
+        """
+        tool_name = gcmd.get('TOOL_NAME')
+        offsets = ast.literal_eval(gcmd.get('OFFSETS'))
+        
+        # Validate offsets format
+        if not isinstance(offsets, list) or len(offsets) != 3:
+            raise gcmd.error("OFFSETS must be a list of 3 values [x, y, z]")
+        
+        # Enter docking mode to remove current offset transform
+        self.gcode.run_script_from_command("ENTER_DOCKING_MODE")
+        
+        # Apply new offsets to tool
+        self.gcode.run_script_from_command(
+            'SET_TOOL_PARAMETER TOOL="%s" PARAMETER="gcode_x_offset" VALUE="%s"' % (tool_name, offsets[0])
+        )
+        self.gcode.run_script_from_command(
+            'SET_TOOL_PARAMETER TOOL="%s" PARAMETER="gcode_y_offset" VALUE="%s"' % (tool_name, offsets[1])
+        )
+        self.gcode.run_script_from_command(
+            'SET_TOOL_PARAMETER TOOL="%s" PARAMETER="gcode_z_offset" VALUE="%s"' % (tool_name, offsets[2])
+        )
+        
+        # Exit docking mode to reapply transform with new offsets
+        self.gcode.run_script_from_command("EXIT_DOCKING_MODE")
+        
+        gcmd.respond_info("Applied live offsets to %s: %s" % (tool_name, offsets))
 
     cmd_AXISCOPE_SAVE_MULTIPLE_TOOL_OFFSETS_help = "Save multiple tool offsets to your axiscope config file."
 

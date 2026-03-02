@@ -167,6 +167,16 @@ const nonZeroListItem = ({tool_number, tool_name, cx_offset, cy_offset, disabled
               <span class="fs-6 lh-sm"><small>New Z</small></span>
               <span class="fs-5 lh-sm" id="T${tool_number}-z-new"><small>0.0</small></span>
             </div>
+            <div class="row text-center pb-1">
+              <button 
+                class="btn btn-warning btn-sm apply-live-btn" 
+                data-tool="${tool_number}"
+                data-tool-name="${tool_name}"
+                title="Apply offsets to tool immediately (not saved)"
+              >
+                <i class="bi bi-lightning-fill"></i> Apply Live
+              </button>
+            </div>
             <div class="row text-end">
               <button 
                 class="btn btn-success btn-sm save-offset-btn d-none" 
@@ -346,6 +356,51 @@ function calibrateAllTools() {
     });
 }
 
+function applyLiveOffset(toolNumber, toolName, $button) {
+  // Get offset values from DOM
+  const xOffset = $('#T' + toolNumber + '-x-new').find('>:first-child').text();
+  const yOffset = $('#T' + toolNumber + '-y-new').find('>:first-child').text();
+  const zOffset = $('#T' + toolNumber + '-z-new').find('>:first-child').text();
+  
+  // Format as array
+  const offsets = `[${xOffset}, ${yOffset}, ${zOffset}]`;
+  
+  // Build G-code command
+  const gcode = `AXISCOPE_APPLY_LIVE_OFFSET TOOL_NAME="${toolName}" OFFSETS="${offsets}"`;
+  const url = printerUrl(printerIp, "/printer/gcode/script?script=" + encodeURIComponent(gcode));
+  
+  // Save original button state
+  const originalHtml = $button.html();
+  
+  // Disable button and show applying state
+  $button.prop('disabled', true);
+  $button.html('<i class="bi bi-hourglass-split"></i> Applying...');
+  
+  $.get(url)
+    .done(function() {
+      console.log('Applied live offsets for ' + toolName);
+      // Show success state
+      $button.html('<i class="bi bi-check-circle-fill text-success"></i> Applied!');
+      
+      // Revert after 2 seconds
+      setTimeout(function() {
+        $button.html(originalHtml);
+        $button.prop('disabled', false);
+      }, 2000);
+    })
+    .fail(function(error) {
+      console.error('Failed to apply live offsets for ' + toolName + ':', error);
+      // Show error state
+      $button.html('<i class="bi bi-x-circle-fill text-danger"></i> Failed');
+      
+      // Revert after 2 seconds
+      setTimeout(function() {
+        $button.html(originalHtml);
+        $button.prop('disabled', false);
+      }, 2000);
+    });
+}
+
 function saveToolOffset(toolNumber, toolName, $button) {
   // Get offset values from DOM
   const xOffset = $('#T' + toolNumber + '-x-new').find('>:first-child').text();
@@ -446,6 +501,13 @@ function getTools() {
         if (hasProbeResults) {
           $('.z-fields').removeClass('d-none');
         }
+        
+        // Attach click handlers to apply live buttons (always visible)
+        $('.apply-live-btn').off('click').on('click', function() {
+          const toolNumber = $(this).data('tool');
+          const toolName = $(this).data('tool-name');
+          applyLiveOffset(toolNumber, toolName, $(this));
+        });
         
         // Show save buttons if config file is available, otherwise show copy buttons
         if (canSaveConfig) {
