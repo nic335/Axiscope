@@ -33,10 +33,18 @@ class Axiscope:
         self.has_cfg_data     = False
         self.probe_results = {}
 
+        # Check for tools_calibrate conflict
+        if config.has_section('tools_calibrate'):
+            raise config.error(
+                "Cannot use [axiscope] when [tools_calibrate] is also configured. "
+                "Both modules conflict with each other. "
+                "Please use only one: either [axiscope] or [tools_calibrate]."
+            )
+
         #setup endstop in query_endstops if pin is set
         if self.pin is not None:
             self.probe_multi_axis = tools_calibrate.PrinterProbeMultiAxis(
-                config, 
+                config,
                 tools_calibrate.ProbeEndstopWrapper(config, 'x'),
                 tools_calibrate.ProbeEndstopWrapper(config, 'y'),
                 tools_calibrate.ProbeEndstopWrapper(config, 'z')
