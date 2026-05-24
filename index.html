@@ -94,6 +94,20 @@
                         </div>
                     </div>
 
+                    <!-- Optional Camera IP Override -->
+                    <div class="mb-3">
+                        <label for="cameraIp" class="form-label">
+                            Camera IP Address <span class="text-muted">(optional)</span>
+                        </label>
+                        <input type="text" class="form-control" id="cameraIp" placeholder="Leave blank to use the printer IP">
+                        <div class="form-text">
+                            Use this if the camera is hosted on a different device than the printer.
+                        </div>
+                        <div id="cameraIpError" class="text-danger mt-2" style="display: none;">
+                            Invalid camera IP address format
+                        </div>
+                    </div>
+
                     <!-- Camera Selection (initially hidden) -->
                     <div id="camera-select" class="mb-3">
                         <label class="form-label">Select Camera</label>
