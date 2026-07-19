@@ -43,8 +43,28 @@ function updatePage() {
       updateMotor(checkActiveStepper(steppers));
       updateTools(tools, tool_number);
       updateBedMap(axiscope, axis_min, axis_max, gcode_pos);
+      updateLedControl(axiscope);
     }
   });
+}
+
+let isLedSliderActive = false;
+
+function updateLedControl(axiscope) {
+    const $ledControl = $('#led-control');
+    const $ledSlider = $('#led-range');
+
+    if (!axiscope || !axiscope.has_led) {
+        $ledControl.hide();
+        return;
+    }
+
+    $ledControl.show();
+
+    // Avoid fighting the user while they are actively dragging the slider
+    if (!isLedSliderActive) {
+        $ledSlider.val(Math.round(axiscope.led_value * 100));
+    }
 }
 
 function updateBedMap(axiscope, axis_min, axis_max, gcode_pos) {
@@ -455,16 +475,16 @@ $(document).ready(function() {
                                 $cameraList.empty();
                                 
                                 cams.forEach(function(cam) {
-                                    // Extract path from cam.stream_url (remove protocol and host if present)
-                                    let streamPath = cam.stream_url;
+                                    // Use the full URL from Moonraker if it's a complete URL, otherwise construct it
+                                    let streamUrl;
                                     try {
                                         const url = new URL(cam.stream_url);
-                                        streamPath = url.pathname + url.search;
+                                        // It's a full URL, use it as-is
+                                        streamUrl = cam.stream_url;
                                     } catch (e) {
-                                        // If not a full URL, use as-is (already a path)
-                                        streamPath = cam.stream_url;
+                                        // Not a full URL, it's just a path - construct with printer IP
+                                        streamUrl = printerUrl(ip, cam.stream_url);
                                     }
-                                    const streamUrl = printerUrl(ip, streamPath);
                                     const snapshotUrl = streamUrl.replace('?action=stream', '?action=snapshot');
                                     
                                     const cameraOption = `
