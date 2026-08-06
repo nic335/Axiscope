@@ -39,9 +39,9 @@ Axiscope provides:
 | Option | Details |
 |---|---|
 | **DIY** | [XY Nozzle Alignment Camera](https://www.printables.com/model/1099576-xy-nozzle-alignment-camera) (3D printed parts) + OV9726 camera module + 4x 5V 3mm round white (6000-6500K) LEDs |
-| **Pre-assembled** | [Ember Prototypes CXC](https://www.emberprototypes.com/products/cxc) — long USB cable, ready to mount |
+| **Pre-assembled** | [Ember Prototypes CXC](https://www.emberprototypes.com/products/cxc) — long USB cable, ready to mount, portable z endstop |
 
-> The Ember Prototype V2 (CXC) camera has an onboard PWM-controlled LED that Axiscope can drive directly from a spare MCU PWM pin. See [LED Control](#led-control-ember-prototype-v2-camera).
+> The CXC V2 camera from Ember Prototypes has an onboard PWM-controlled LED that Axiscope can drive directly from a spare MCU PWM pin. See [LED Control](#led-control-ember-prototype-v2-camera).
 
 ### Z Calibration (Optional)
 
