@@ -27,8 +27,10 @@
     <script src="./js/index.js"></script>
     <script src="./js/tools.js"></script>
     <script src="./js/gcode.js"></script>
+    <script src="./js/camera-settings.js"></script>
 
     <link rel="stylesheet" href="./css/camera.css">
+    <link rel="stylesheet" href="./css/camera-settings.css">
 
     <style>
         .modal-content {
@@ -122,14 +124,19 @@
                     <div class="row p-2 pb-2">
                         <!-- Flip Controls -->
                         <div class="row p-2">
-                            <div class="col-6">
+                            <div class="col-5">
                                 <button type="button" class="btn btn-secondary w-100" id="flip-horizontal">
                                     <i class="bi bi-arrow-left-right"></i> Flip Horizontal
                                 </button>
                             </div>
-                            <div class="col-6">
+                            <div class="col-5">
                                 <button type="button" class="btn btn-secondary w-100" id="flip-vertical">
                                     <i class="bi bi-arrow-down-up"></i> Flip Vertical
+                                </button>
+                            </div>
+                            <div class="col-2">
+                                <button type="button" class="btn btn-secondary w-100" id="open-camera-settings" title="Camera Settings">
+                                    <i class="bi bi-sliders"></i>
                                 </button>
                             </div>
                         </div>
@@ -232,6 +239,22 @@
                 <ul class="list-group" id="tool-list"></ul>
 
             </div>
+        </div>
+    </div>
+
+    <!-- Camera Settings Offcanvas -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="cameraSettingsPanel" aria-labelledby="cameraSettingsPanelLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="cameraSettingsPanelLabel">Camera Settings</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div class="mb-3" id="v4l2-device-select-wrap" style="display:none;">
+                <label for="v4l2-device-select" class="form-label">Device</label>
+                <select class="form-select" id="v4l2-device-select"></select>
+            </div>
+            <div id="v4l2-controls-status" class="text-secondary small mb-2"></div>
+            <div id="v4l2-controls-container"></div>
         </div>
     </div>
   </body>

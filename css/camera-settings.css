@@ -1,0 +1,12 @@
+#cameraSettingsPanel {
+    width: 340px;
+}
+
+.v4l2-control-row.v4l2-control-inactive {
+    opacity: 0.5;
+}
+
+#v4l2-controls-container label {
+    text-transform: capitalize;
+    font-size: 13px;
+}
