@@ -1,227 +1,331 @@
-<html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Axiscope</title>
-  <head>
-    <script
-      src="https://code.jquery.com/jquery-3.7.1.min.js"
-      integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
-      crossorigin="anonymous"
-    >
-    </script>
+  <link rel="stylesheet" href="./css/design.css">
+  <link rel="stylesheet" href="./css/app-live.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <button class="brand" id="brand" type="button">
+      <span class="brand-symbol"><i data-icon="scope" data-size="27"></i></span>axiscope<span class="version">/ 02</span>
+    </button>
+    <nav aria-label="Main navigation">
+      <button id="nav-calibration" data-tab="calibration" type="button" class="active"><i data-icon="scope" data-size="16"></i>Calibration</button>
+      <button id="nav-offsets" data-tab="offsets" type="button"><i data-icon="sliders" data-size="16"></i>Offsets</button>
+      <button id="nav-setup" data-tab="setup" type="button"><i data-icon="power" data-size="16"></i>Setup</button>
+    </nav>
+    <div class="top-right">
+      <span class="demo-label" id="conn-label">OFFLINE</span>
+      <a href="https://github.com/nic335/Axiscope/blob/main/README.md" target="_blank" rel="noreferrer" aria-label="Open Axiscope documentation"><i data-icon="book"></i></a>
+    </div>
+  </header>
 
-    <link 
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" 
-      rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" 
-      crossorigin="anonymous"
-    >
-
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-    <script 
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" 
-      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" 
-      crossorigin="anonymous"
-    >
-    </script>
-
-    <script src="./js/camera.js"></script>
-    <script src="./js/index.js"></script>
-    <script src="./js/tools.js"></script>
-    <script src="./js/gcode.js"></script>
-
-    <link rel="stylesheet" href="./css/camera.css">
-
-    <style>
-        .modal-content {
-            border-radius: 10px;
-        }
-        .form-control:focus {
-            border-color: #80bdff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-        }
-        #camera-select {
-            display: none;
-        }
-        .camera-option {
-            cursor: pointer;
-            transition: background-color 0.2s;
-            border: 1px solid #dee2e6;
-            margin-bottom: 10px;
-            border-radius: 5px;
-        }
-        .camera-option:hover {
-            background-color: #f8f9fa;
-        }
-        .camera-option.selected {
-            border-color: #0d6efd;
-            background-color: #e7f1ff;
-        }
-        .camera-preview {
-            width: 160px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 4px;
-        }
-        .camera-list-container {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        #camContainer {
-            display: none;
-        }
-    </style>
-  </head>
-
-  <body data-bs-theme="dark">
-    <!-- Printer IP Modal -->
-    <div class="modal fade" id="printerModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="printerModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="printerModalLabel">Printer Configuration</h5>
-                </div>
-                <div class="modal-body">
-                    <!-- IP Address Input -->
-                    <div class="mb-3">
-                        <label for="printerIp" class="form-label">Printer IP Address</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="printerIp" placeholder="Enter IP address (e.g., 192.168.1.100)">
-                            <button class="btn btn-outline-danger" type="button" id="disconnectBtn" style="display: none;">
-                                Disconnect
-                            </button>
-                        </div>
-                        <div id="ipError" class="text-danger mt-2" style="display: none;">
-                            Invalid IP address format
-                        </div>
-                    </div>
-
-                    <!-- Camera Selection (initially hidden) -->
-                    <div id="camera-select" class="mb-3">
-                        <label class="form-label">Select Camera</label>
-                        <div class="camera-list-container">
-                            <div id="cameraList" class="list-group">
-                                <!-- Camera options will be inserted here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="saveIpBtn">Save IP</button>
-                </div>
-            </div>
-        </div>
+  <main>
+    <div class="page-heading" id="page-heading" hidden>
+      <div>
+        <div class="eyebrow">PRECISION, IN EVERY AXIS</div>
+        <h1><span id="page-title">Tool offsets</span><span class="title-dot">.</span></h1>
+        <p id="page-sub">Review your captured offsets relative to T0.</p>
+      </div>
+      <div class="printer-chip">
+        <span class="status-dot" id="chip-dot"></span>
+        <div><span id="chip-host">Not connected</span> <span class="muted">/ Toolchanger</span><small id="chip-sub">Klipper · Moonraker</small></div>
+        <span class="printer-tag" id="chip-tools">–</span>
+      </div>
     </div>
 
-    <div class="container text-center">
-        <div class="row">
-            <!-- ----------- body.jinja------------------>
-            <div class="col p-3">
-                <div class="border border-secondary-subtle rounded bg-body-tertiary p-2">
-                    <div class="row p-2 pb-2">
-                        <button name="ChangePrinter" id="ChangePrinter">Change Printer / Camera</button>
-                    </div>
-                    <div class="row p-2 pb-2">
-                        <!-- Flip Controls -->
-                        <div class="row p-2">
-                            <div class="col-6">
-                                <button type="button" class="btn btn-secondary w-100" id="flip-horizontal">
-                                    <i class="bi bi-arrow-left-right"></i> Flip Horizontal
-                                </button>
-                            </div>
-                            <div class="col-6">
-                                <button type="button" class="btn btn-secondary w-100" id="flip-vertical">
-                                    <i class="bi bi-arrow-down-up"></i> Flip Vertical
-                                </button>
-                            </div>
-                        </div>
-                        <div id="camContainer" class="img-overlay-wrap">
-                        <img id="zoom-image" src="" width="800"/>
-                        <svg viewBox="0 0 200 200">
-                            <circle cx="100" cy="75" r="50" stroke="red" stroke-width="0.25" fill="none"/>
-                            <line x1="100" y1="15" x2="100" y2="135" stroke="red" stroke-width="0.25" />
-                            <line x1="40" y1="75" x2="160" y2="75" stroke="red" stroke-width="0.25" />
-                        </svg>
-                        </div>
-                        <div class="row p-2">
-                        <div class="col-1">
-                            <i class="bi bi-zoom-out"></i>
-                        </div>
-                        <div class="col-10">
-                            <input type="range" class="form-range" min="0" max="600" value="0" id="zoom-range">
-                        </div>
-                        <div class="col-1">
-                            <i class="bi bi-zoom-in"></i>
-                        </div>
-                        </div>
-                    
-                        <div class="row p-2">
-                        <div class="col-1">
-                            <i class="bi bi-brightness-low"></i>
-                        </div>
-                        <div class="col-10">
-                            <input type="range" class="form-range" min="0" max="400" id="contrast-range">
-                        </div>
-                        <div class="col-1">
-                            <i class="bi bi-brightness-high"></i>
-                        </div>
-                        </div>
-                    </div>
-                        <!---------------------------- positioning --------------------->
-                    <div id="positioning">
-                        <div class="row justify-content-center">
-                        <ul class="list-group list-group-horizontal-sm justify-content-center pb-2">
-                            <li class="list-group-item"><span>X: </span><span id="pos-x">0.0</span></li>
-                            <li class="list-group-item"><span>Y: </span><span id="pos-y">0.0</span></li>
-                            <li class="list-group-item"><span>Z: </span><span id="pos-z">0.0</span></li>
-                        </ul>
-                        </div>
-                        <div class="row">
-                        <div class="btn-toolbar justify-content-center" role="toolbar" aria-label="Homing Toolbar">
-                            <div class="btn-group btn-group-sm ps-5 pe-5 pb-1" role="group" aria-label="">
-                            <button type="button" class="btn btn-danger border" id="home-all" data-homed="false" data-url="">HOME ALL</button>
-                            <button type="button" class="btn btn-danger border" id="qgl" data-qgl="false" data-url="">QGL</button>
-                            <button type="button" class="btn btn-danger border" id="disable-motors" data-motoron="false" data-url="">DISABLE</button>
-                            </div>
-                        </div>
-                        </div>
-                        <div id="BouncePositionBar"></div>
-                        <div id="BigPositionBar"></div>
-                        <!-- Endstop Position Section -->
-                        <div id="endstop-section" class="mt-2 mb-1 border-top border-secondary pt-2" style="display:none;">
-                            <div class="d-flex align-items-center justify-content-between px-2 pb-1">
-                                <small class="text-secondary fw-semibold text-uppercase" style="font-size:10px;letter-spacing:0.05em;">Z Endstop Position</small>
-                                <button type="button" class="btn btn-success btn-sm" id="set-endstop-position" title="Set current position as axiscope endstop position">
-                                    <i class="bi bi-crosshair2"></i> Set Current Position
-                                </button>
-                            </div>
-                            <div class="d-flex justify-content-center">
-                                <svg id="bed-map-svg" style="display:block;"></svg>
-                            </div>
-                            <div class="d-flex justify-content-center gap-3 pt-1" style="font-size:10px;color:#888;">
-                                <span><svg width="10" height="10"><line x1="0" y1="5" x2="10" y2="5" stroke="#22c55e" stroke-width="1.5"/><line x1="5" y1="0" x2="5" y2="10" stroke="#22c55e" stroke-width="1.5"/></svg> Z-switch</span>
-                                <span><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#3b82f6" fill-opacity="0.8"/></svg> Nozzle</span>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- -------------------------- positioning ------------------- -->
-                </div>
-            </div>
-            <div class="col p-3">
-                <div class="border border-secondary-subtle rounded bg-body-tertiary p-2 mb-3">
-                <div class="row p-2 pb-2">
-                    <div class="col-9">
-                    <input type="text" class="w-100 form-control" placeholder="" id="gcode-input">
-                    </div>
-                    <div class="col-3">
-                    <button type="button" class="btn btn-dark w-100" id="gcode-send">Send</button>
-                    </div>
-                </div>
-                </div>
+    <!-- ============================ CALIBRATION ============================ -->
+    <section class="view" id="view-calibration" data-oc-screen="calibration">
+      <section class="workflow" aria-label="Calibration progress">
+        <div class="workflow-step" id="wf-ref"><span class="step-num">01</span><div>Set reference<small id="wf-ref-sub">Capture the T0 position</small></div></div>
+        <span class="workflow-line"></span>
+        <div class="workflow-step" id="wf-align"><span class="step-num">02</span><div>Align tools<small id="wf-align-sub">0 of 0 tools calibrated</small></div></div>
+        <span class="workflow-line"></span>
+        <div class="workflow-step" id="wf-review"><span class="step-num">03</span><div>Review offsets<small>Verify &amp; save</small></div></div>
+        <span class="session-tag" id="session-tag">MANUAL XY</span>
+      </section>
 
-                <ul class="list-group" id="tool-list"></ul>
-
+      <div class="workbench">
+        <section class="camera-panel panel">
+          <div class="panel-head">
+            <h2><i data-icon="camera" data-size="16"></i>Alignment camera</h2>
+            <span class="feed-label" id="feed-label-wrap"><i></i><span id="feed-label">NO FEED</span></span>
+          </div>
+          <div class="camera-viewport" id="camera-viewport">
+            <div class="camera-stage" id="camera-stage">
+              <img id="camera-img" alt="Live nozzle camera feed">
+              <img id="edge-img" class="edge-img" alt="" hidden>
+              <svg id="overlay" class="camera-overlay" aria-hidden="true"></svg>
             </div>
+            <div class="camera-empty" id="camera-empty">
+              <i data-icon="camera" data-size="28"></i>
+              <p id="camera-empty-text">No camera connected</p>
+              <button class="secondary" type="button" data-goto="setup">Connect in Setup <i data-icon="arrow" data-size="14"></i></button>
+            </div>
+            <span class="camera-tag">CAM <span>·</span> <b id="cam-name">—</b></span>
+            <span class="tool-overlay" id="tool-overlay">T– <span>NO TOOL</span></span>
+            <div class="camera-coordinates">X <b id="cc-x">—</b><span></span>Y <b id="cc-y">—</b><span></span>Z <b id="cc-z">—</b></div>
+          </div>
+          <div class="camera-footer">
+            <label class="toggle-label"><input id="crosshair-enabled" type="checkbox" role="switch" checked> Crosshair</label>
+            <div class="view-tools">
+              <button type="button" class="chip-btn" id="flip-h" aria-pressed="false" title="Mirror the image horizontally">Flip H</button>
+              <button type="button" class="chip-btn" id="flip-v" aria-pressed="false" title="Mirror the image vertically">Flip V</button>
+            </div>
+            <label class="contrast-control" for="contrast">Contrast <input id="contrast" type="range" min="50" max="300" value="100"></label>
+            <div class="zoom-controls">
+              <button type="button" id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">100%</span><button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+            </div>
+            <button type="button" class="text-button" id="reset-view"><i data-icon="reset" data-size="14"></i> Reset view</button>
+          </div>
+
+          <details class="camera-tuning" id="camera-tuning">
+            <summary>LED illumination <span class="camera-setting-status" id="camera-control-summary">LED 0%</span></summary>
+            <p class="hardware-note" id="led-note">Set an LED command in Setup to drive your camera LED from here.</p>
+            <div class="control-row">
+              <label for="led-enabled"><input id="led-enabled" type="checkbox" role="switch">LED illumination</label>
+              <output id="led-duty" class="manual-status" aria-live="polite">PWM 0% · duty 0.00</output>
+            </div>
+            <fieldset id="led-fieldset" aria-label="LED PWM level">
+              <div data-dial="led-pwm"></div>
+            </fieldset>
+            <div class="pwm-meter" aria-hidden="true"><span id="pwm-meter"></span></div>
+            <div class="control-row"><span class="hardware-note">Exposure, gain and white balance stay in your camera configuration.</span><button type="button" id="reset-camera-controls" class="text-button">Reset LED</button></div>
+          </details>
+
+          <section class="detection-panel" aria-labelledby="detection-title">
+            <div class="detection-heading">
+              <div>
+                <h3 id="detection-title">◎ Circle detection <small id="det-engine">OPENCV</small></h3>
+                <p id="det-sub">Edge detection, then a search for concentric circles on the live frame</p>
+              </div>
+              <label class="detection-switch"><input id="detection-enabled" type="checkbox" role="switch" aria-label="Circle detection"><span id="det-onoff">Off</span></label>
+            </div>
+            <div class="detection-body" id="detection-body" hidden>
+              <div class="detection-ranges">
+                <div data-dial="min_radius"></div>
+                <div data-dial="max_radius"></div>
+                <div data-dial="hough_votes"></div>
+              </div>
+              <div class="detection-result">
+                <span id="detection-status" role="status">Waiting for a frame…</span>
+                <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
+              </div>
+              <details class="detection-advanced">
+                <summary>Advanced tuning</summary>
+                <div class="detection-advanced-body">
+                  <div class="detection-ranges">
+                    <div data-dial="canny_low"></div>
+                    <div data-dial="canny_high"></div>
+                    <div data-dial="blur"></div>
+                    <div data-dial="min_coverage"></div>
+                  </div>
+                  <div class="detection-toggles">
+                    <label class="toggle-label"><input id="circle-concentric" type="checkbox" role="switch">Require concentric rings</label>
+                    <label class="toggle-label"><input id="circle-overlay" type="checkbox" role="switch">Show circle overlay</label>
+                    <label class="toggle-label"><input id="circle-edges" type="checkbox" role="switch">Show edge map</label>
+                    <button id="detection-reset" class="text-button" type="button">Reset tuning</button>
+                  </div>
+                  <p>Radii are source-image pixels, independent of zoom. A nozzle usually shows two or more rings (orifice and tip face); requiring concentric rings rejects stray single circles. Use the edge map to tune Canny and blur: the rings should be clean, unbroken lines.</p>
+                </div>
+              </details>
+            </div>
+          </section>
+
+          <section class="align-panel" id="align-panel" hidden aria-labelledby="align-title">
+            <div class="align-head">
+              <h3 id="align-title">Auto alignment <small id="align-state">RUNNING</small></h3>
+              <button type="button" class="text-button" id="align-cancel">Cancel</button>
+            </div>
+            <ol class="align-steps" id="align-steps" aria-live="polite"></ol>
+            <div class="align-result" id="align-result" hidden>
+              <div class="align-metrics" id="align-metrics"></div>
+              <p class="align-verdict" id="align-verdict"></p>
+              <div class="align-actions">
+                <button type="button" class="primary" id="align-accept"><i data-icon="check" data-size="15"></i><span id="align-accept-label">Accept &amp; capture</span></button>
+                <button type="button" class="secondary" id="align-retry">Run again</button>
+                <button type="button" class="text-button" id="align-revert"><i data-icon="reset" data-size="14"></i>Revert move</button>
+                <button type="button" class="text-button" id="align-dismiss">Dismiss</button>
+              </div>
+            </div>
+          </section>
+
+          <details class="camera-tuning" id="console-panel">
+            <summary>G-code console <span class="camera-setting-status" id="console-status"></span></summary>
+            <form class="console-form" id="console-form">
+              <input id="gcode-input" autocomplete="off" spellcheck="false" placeholder="e.g. G28, M118 hello" aria-label="G-code command">
+              <button type="submit" class="secondary">Send</button>
+            </form>
+            <pre class="console-log" id="console-log" tabindex="0" aria-label="Console history"></pre>
+          </details>
+        </section>
+
+        <aside class="tool-rail" aria-label="Tool alignment and offsets">
+          <section class="control-panel panel">
+            <div class="panel-head"><h2>Tool alignment</h2><span class="mini-label">XY</span></div>
+            <div class="controls-body">
+              <div class="machine-actions" role="group" aria-label="Machine">
+                <button type="button" id="btn-home" class="machine-btn" title="G28">Home</button>
+                <button type="button" id="btn-qgl" class="machine-btn" title="QUAD_GANTRY_LEVEL">QGL</button>
+                <button type="button" id="btn-motors" class="machine-btn" title="M84">Motors off</button>
+              </div>
+              <div class="separator"></div>
+              <div class="label-row"><label for="tool-select">Active tool</label><span id="tool-count">No tools</span></div>
+              <label class="large-tool-select" id="tool-select-wrap" hidden>Select toolhead<select id="tool-select"></select></label>
+              <div class="tool-tabs" id="tool-tabs"></div>
+              <div class="tool-description">
+                <span class="small-scope"><i data-icon="scope" data-size="17"></i></span>
+                <div><span id="tool-desc">Connect a printer</span><small id="tool-desc-sub">Selecting a tool runs a tool change</small></div>
+              </div>
+              <div class="separator"></div>
+              <div class="label-row"><label>Move increment</label><span>mm</span></div>
+              <div class="increments" id="increments"></div>
+              <div class="jog-wrap">
+                <div class="jog-pad">
+                  <span class="axis-label axis-y">Y</span>
+                  <button type="button" class="jog up" data-jog="Y" data-dir="1" aria-label="Move Y positive">↑</button>
+                  <button type="button" class="jog left" data-jog="X" data-dir="-1" aria-label="Move X negative">←</button>
+                  <button type="button" id="jog-align-circle" class="jog center" aria-label="Auto align to detected circle"><i data-icon="scope" data-size="22"></i></button>
+                  <button type="button" class="jog right" data-jog="X" data-dir="1" aria-label="Move X positive">→</button>
+                  <button type="button" class="jog bottom" data-jog="Y" data-dir="-1" aria-label="Move Y negative">↓</button>
+                  <span class="axis-label axis-x">X</span>
+                </div>
+                <div class="z-jog" role="group" aria-label="Z">
+                  <button type="button" class="jog" data-jog="Z" data-dir="1" aria-label="Move Z up">Z+</button>
+                  <button type="button" class="jog" data-jog="Z" data-dir="-1" aria-label="Move Z down">Z−</button>
+                </div>
+              </div>
+              <div class="position-readout">
+                <div><span>X POSITION</span><b id="pos-x">—<small>mm</small></b></div>
+                <div><span>Y POSITION</span><b id="pos-y">—<small>mm</small></b></div>
+              </div>
+              <button id="capture" class="primary" type="button"><i data-icon="scope" data-size="17"></i><span id="capture-label">Capture reference</span><span>↵</span></button>
+              <p class="capture-hint" id="capture-hint">Offsets are calculated relative to T0</p>
+            </div>
+          </section>
+          <div id="rail-offsets"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============================== OFFSETS ============================== -->
+    <section class="view" id="view-offsets" data-oc-screen="offsets" hidden>
+      <div id="offsets-list"></div>
+
+      <section class="panel config-preview" aria-labelledby="config-preview-title">
+        <div class="panel-head">
+          <h2 id="config-preview-title"><i data-icon="sliders" data-size="16"></i>Configuration preview</h2>
+          <span class="mini-label" id="config-state">PROPOSED CHANGES</span>
         </div>
-    </div>
-  </body>
-  <footer></footer>
+        <div class="config-summary">
+          <p>New offsets relative to T0, merged with each tool's current offset. Only captured tools are included.</p>
+          <span class="count" id="config-count">0 / 0 tools</span>
+        </div>
+        <pre id="config-preview" tabindex="0" aria-label="Proposed Klipper tool configuration"><code id="config-code"></code></pre>
+        <div class="config-actions">
+          <button type="button" class="secondary" id="copy-config">Copy config</button>
+          <button type="button" class="primary" id="save-config">Save to config file</button>
+        </div>
+        <p class="config-note" id="config-note">Saving writes through AXISCOPE_SAVE_TOOL_OFFSET to the file set by <code>config_file_path</code>. Restart Klipper afterwards to load the new offsets.</p>
+      </section>
+
+      <div class="setup-grid offsets-extra">
+        <section class="panel setup-panel" id="zcal-panel" hidden>
+          <h2>Z offsets</h2>
+          <p>Probe every tool on the Z switch and compute Z offsets relative to T0. Results appear on the offset cards and in the configuration preview.</p>
+          <button type="button" class="secondary" id="calibrate-z">Calibrate all Z offsets <i data-icon="arrow" data-size="14"></i></button>
+        </section>
+        <section class="panel setup-panel" id="endstop-panel" hidden>
+          <div class="endstop-head"><h2>Z endstop position</h2><button type="button" class="secondary" id="set-endstop">Set to current position</button></div>
+          <div class="bed-map-wrap"><svg id="bed-map" role="img" aria-label="Bed map with Z switch and nozzle position"></svg></div>
+          <p class="bed-legend"><span class="lg-switch"></span>Z switch <span class="lg-nozzle"></span>Nozzle</p>
+        </section>
+      </div>
+    </section>
+
+    <!-- =============================== SETUP =============================== -->
+    <section class="view" id="view-setup" data-oc-screen="setup" hidden>
+      <div class="setup-grid">
+        <section class="panel setup-panel" aria-labelledby="conn-title">
+          <h2 id="conn-title">Printer connection</h2>
+          <p>Axiscope talks to Moonraker directly. Use the printer's address, with a port if Moonraker is not on 80.</p>
+          <form class="conn-form" id="conn-form" novalidate>
+            <label for="printer-ip">Printer address</label>
+            <div class="tool-count-form">
+              <input id="printer-ip" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="192.168.1.100 or voron.local">
+              <button type="submit" class="secondary" id="connect-btn">Connect</button>
+              <button type="button" class="text-button" id="disconnect-btn" hidden>Disconnect</button>
+            </div>
+            <p class="form-status" id="conn-status" role="status"></p>
+          </form>
+          <div class="camera-list" id="camera-list" hidden></div>
+        </section>
+
+        <section class="panel setup-panel" aria-labelledby="align-settings-title">
+          <h2 id="align-settings-title">Auto alignment</h2>
+          <p>Scan, probe-move to learn the camera scale and orientation, correct, then re-scan. It stops after the iteration limit and always asks you to confirm.</p>
+          <div class="settings-grid" id="align-settings"></div>
+          <label class="toggle-label settings-switch"><input id="set-reuse" type="checkbox" role="switch">Reuse camera calibration between tools (skips probe moves)</label>
+          <div class="setup-row">
+            <i data-icon="camera"></i>
+            <div><b>Vision engine</b><p id="vision-status">Checking…</p></div>
+            <span class="pill" id="vision-pill">…</span>
+          </div>
+          <button type="button" class="text-button" id="align-settings-reset">Reset to defaults</button>
+        </section>
+      </div>
+
+      <div class="setup-grid">
+        <section class="panel theme-panel" aria-labelledby="theme-title">
+          <div class="panel-head"><h2 id="theme-title"><i data-icon="sliders" data-size="16"></i>Appearance</h2><span class="mini-label">JSON THEME</span></div>
+          <div class="theme-body">
+            <div class="theme-intro"><h3>Your workspace. Your settings.</h3><p>Choose a starting point, then fine-tune the JSON. Themes apply to every view and are remembered in this browser.</p></div>
+            <label class="theme-label" for="theme-preset">Theme preset</label>
+            <select id="theme-preset">
+              <option value="" disabled selected>Choose a preset</option>
+              <option value="precision">Precision · lime</option>
+              <option value="arctic">Arctic · ice blue</option>
+              <option value="copper">Copper · warm amber</option>
+            </select>
+            <div class="theme-label-row"><label class="theme-label" for="theme-json">Theme JSON</label><span>5 shared tokens</span></div>
+            <textarea id="theme-json" spellcheck="false" aria-describedby="theme-help theme-feedback"></textarea>
+            <p id="theme-help" class="theme-help">Six-digit hex colors · density 0.75–1.15 · radius 0–14px. Dark surfaces and bright accents preserve contrast.</p>
+            <div class="theme-actions">
+              <button type="button" id="theme-apply" class="primary">Apply theme</button>
+              <button type="button" id="theme-export" class="secondary">Export JSON ↓</button>
+              <button type="button" id="theme-reset" class="text-button">Reset defaults</button>
+            </div>
+            <p id="theme-feedback" class="theme-feedback" role="status"></p>
+          </div>
+        </section>
+
+        <section class="panel setup-panel" aria-labelledby="led-title">
+          <h2 id="led-title">Camera LED</h2>
+          <p>G-code sent when the LED switch or level changes. <code>{value}</code> is 0–1, <code>{percent}</code> is 0–100. Leave empty to hide LED control.</p>
+          <label class="theme-label" for="led-template">LED command</label>
+          <input id="led-template" class="text-input" type="text" spellcheck="false" placeholder="SET_PIN PIN=nozzle_cam_led VALUE={value}">
+          <p class="theme-help">Examples: <code>SET_PIN PIN=cam_led VALUE={value}</code> for an <code>[output_pin]</code>, or <code>SET_LED LED=cam WHITE={value}</code> for an <code>[led]</code>.</p>
+          <a class="secondary" href="https://github.com/nic335/Axiscope/blob/main/README.md#configuration" target="_blank" rel="noreferrer">View hardware configuration guide ↗</a>
+        </section>
+      </div>
+    </section>
+
+    <div class="notice" id="notice" role="status"></div>
+    <footer>
+      <span><span class="status-dot" id="footer-dot"></span><span id="footer-status">Not connected</span></span>
+      <span>AXISCOPE <span class="muted">/</span> BUILT FOR ALIGNMENT</span>
+    </footer>
+  </main>
+</div>
+
+<script src="./js/icons.js"></script>
+<script src="./js/printer.js"></script>
+<script src="./js/camera.js"></script>
+<script src="./js/app.js"></script>
+<script src="./js/vision.js"></script>
+</body>
 </html>

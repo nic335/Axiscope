@@ -100,6 +100,13 @@ echo "Installing Python dependencies..."
 pip install --upgrade pip
 pip install flask waitress  # Install Flask and Waitress WSGI server
 
+# OpenCV powers circle detection and auto alignment. The manual UI still works without it.
+echo "Installing OpenCV (headless) for auto alignment..."
+pip install numpy opencv-python-headless || {
+    echo "Warning: OpenCV could not be installed. Auto alignment will be unavailable."
+    echo "You can retry later with: ${INSTALL_DIR}/${AXISCOPE_ENV}/bin/pip install numpy opencv-python-headless"
+}
+
 # Create the service file
 echo "Creating service file..."
 SERVICE_FILE="${INSTALL_DIR}/axiscope.service"
@@ -167,6 +174,8 @@ type: git_repo
 path: ${INSTALL_DIR}
 origin: ${REPO_URL}
 primary_branch: ${BRANCH}
+virtualenv: ${INSTALL_DIR}/${AXISCOPE_ENV}
+requirements: requirements.txt
 is_system_service: True
 managed_services: axiscope
 EOL

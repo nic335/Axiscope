@@ -1,0 +1,4 @@
+flask
+waitress
+numpy
+opencv-python-headless

@@ -166,6 +166,33 @@ cors_domains:
 <img style="padding-bottom: 10px;" src="media/CapturePosChangeT1.gif" alt="Alt text" width="500"/><br/>
 <img style="padding-bottom: 10px;" src="media/GrabOffset.gif" alt="Alt text" width="500"/><br/>
 
+### Auto alignment (OpenCV)
+
+Axiscope can find and centre the nozzle for you. Detection and motion run on the Axiscope host (OpenCV, installed by `install.sh`); the browser only shows the result.
+
+1. Home the printer, pick up a tool and move it roughly over the camera (within about a third of the view).
+2. In **Circle detection**, switch detection on. Tune *Min / Max radius* until the overlay draws dashed rings on the nozzle (orifice and tip face). *Show edge map* under *Advanced tuning* helps with the Canny and blur settings.
+3. Press **Auto align** (or the crosshair button in the middle of the jog pad). Axiscope then:
+   - **Scan**: Canny edge detection, then a search for concentric circles; the centre comes from a joint fit of all rings.
+   - **Probe**: moves 0.5 mm in X and then in Y and compares the images to learn the camera scale, rotation and mirroring. No camera orientation setup is needed.
+   - **Correct and repeat**: moves the nozzle onto the crosshair, re-scans and corrects again until it is within tolerance, at most *N* times.
+4. Check the camera view and confirm with **Accept & capture**, or use **Revert move** or **Run again**. Nothing is captured without your confirmation.
+
+Iterations, tolerance, probe distance, safety limit, settle time and speed are under **Setup → Auto alignment**. Turn on *Reuse camera calibration* to skip the probe moves for the 2nd and later tools.
+
+Existing installs: the update manager installs OpenCV automatically if your `[update_manager axiscope]` section has these lines (new installs get them):
+
+```ini
+virtualenv: ~/axiscope/axiscope-env
+requirements: requirements.txt
+```
+
+Otherwise, run `~/axiscope/axiscope-env/bin/pip install numpy opencv-python-headless` once and restart the axiscope service.
+
+### Development without a printer
+
+`python tests/mock_moonraker.py` starts a simulated toolchanger and nozzle camera on port 7125. Run `python app.py` and connect to `localhost:7125`. A correct calibration recovers the mock's true offsets. Run the tests with `python -m pytest tests`.
+
 ## Troubleshooting And FAQ
 ### Camera is not shown in Axiscope
 The camera needs to be configured and also configured in mainsail
