@@ -32,6 +32,14 @@ def serve_files(path):
     return send_from_directory('.', path)
 
 
+@app.after_request
+def _no_stale_ui(resp):
+    # Browsers otherwise cache index.html/JS heuristically and keep running an
+    # old UI after an update. no-cache still allows cheap 304 revalidation.
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+
 def _error(message, status=400):
     return jsonify({'error': message}), status
 

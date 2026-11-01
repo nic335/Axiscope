@@ -27,6 +27,8 @@ body { background: var(--canvas, #101211); }
 .ov-error { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 3 3; }
 .camera-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: #858e82; text-align: center; padding: 20px; }
 .camera-empty p { font-size: 12px; }
+.camera-empty-url { max-width: min(90%, 520px); overflow-wrap: anywhere; }
+.camera-empty-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .camera-tag b { font-weight: 400; }
 #feed-label-wrap[data-state="error"], #feed-label-wrap[data-state="error"] i { color: var(--warn); background: none; }
 #feed-label-wrap[data-state="error"] i, #feed-label-wrap[data-state="none"] i { background: #6c7468; }

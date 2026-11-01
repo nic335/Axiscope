@@ -407,6 +407,7 @@ function selectCamera(cam, { keepView = false, stay = false } = {}) {
     LS.set('view', S.view);
   }
   CameraView.setStream(cam.stream);
+  Vision.resetBackoff();
   CameraView.applyView();
   renderCameraList();
   renderView();
@@ -881,6 +882,7 @@ function initEvents() {
 
   $('conn-form').addEventListener('submit', e => { e.preventDefault(); connect($('printer-ip').value); });
   $('disconnect-btn').addEventListener('click', disconnect);
+  $('camera-retry').addEventListener('click', () => { if (S.camera) { CameraView.setStream(S.camera.stream); Vision.resetBackoff(); } });
   $('manual-cam-form').addEventListener('submit', addManualCamera);
 
   $('tool-tabs').addEventListener('click', e => {
@@ -946,7 +948,11 @@ function init() {
     const labels = { none: 'NO FEED', connecting: 'CONNECTING', live: 'LIVE FEED', error: 'FEED ERROR' };
     setText('feed-label', labels[state] + (state === 'live' && CameraView.frame ? ' · ' + CameraView.frame.width + '×' + CameraView.frame.height : ''));
     $('feed-label-wrap').dataset.state = state;
-    setText('camera-empty-text', state === 'error' ? 'The camera stream could not be loaded' : 'No camera connected');
+    const failed = state === 'error' && S.camera;
+    setText('camera-empty-text', failed ? 'The camera stream could not be loaded from' : 'No camera connected');
+    setText('camera-empty-url', failed ? S.camera.stream : '');
+    $('camera-empty-url').hidden = !failed;
+    $('camera-retry').hidden = !failed;
     $('camera-empty').hidden = state === 'live' || state === 'connecting';
   };
   initIncrements();

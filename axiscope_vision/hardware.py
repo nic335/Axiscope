@@ -45,7 +45,7 @@ class SnapshotCamera:
             with urllib.request.urlopen(url, timeout=self.timeout) as resp:
                 data = resp.read()
         except OSError as e:
-            raise HardwareError("Camera snapshot failed: %s" % e)
+            raise HardwareError("Camera snapshot %s failed: %s." % (self.url, e))
         img = decode_image(data)
         if img is None:
             raise HardwareError("Camera returned an image OpenCV cannot decode.")

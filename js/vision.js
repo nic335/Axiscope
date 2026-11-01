@@ -35,6 +35,7 @@ const Vision = {
   dials: {},
   _timer: null,
   _inflight: false,
+  _fails: 0,            // consecutive detection failures, for backoff
   _jobTimer: null,
 
   init() {
@@ -216,7 +217,10 @@ const Vision = {
       if (!this.settings.enabled) CameraView.setDetection(null);
       return;
     }
-    this._timer = setTimeout(() => this.tick(), now ? 0 : 700);
+    // Back off while the snapshot keeps failing (0.7 s doubling up to 15 s),
+    // instead of hammering a dead camera and flooding the console with errors.
+    const delay = this._fails ? Math.min(15000, 700 * 2 ** this._fails) : 700;
+    this._timer = setTimeout(() => this.tick(), now ? 0 : delay);
   },
 
   // Settings changed: run detection again soon, but don't flood the backend.
@@ -228,12 +232,15 @@ const Vision = {
     try {
       const res = await Api.detect({ camera_url: S.camera.snapshot, params: this.params(), edges: this.settings.edges });
       this.last = res;
+      this._fails = 0;
       if (this.shouldDetect()) CameraView.setDetection(res, this.settings.edges ? res.edges : null);
       this.renderDetection(res);
     } catch (e) {
       this.last = null;
+      this._fails++;
       CameraView.setDetection(null);
-      $('detection-status').textContent = e.message;
+      const wait = Math.round(Math.min(15000, 700 * 2 ** this._fails) / 1000);
+      $('detection-status').textContent = 'Detection could not get a frame: ' + e.message + ` Retrying in ${wait} s.`;
     } finally {
       this._inflight = false;
       this.renderEligibility();
@@ -358,8 +365,15 @@ const Vision = {
     $('align-revert').hidden = !job.start_position;
   },
 
+  // A different camera gets a fresh start.
+  resetBackoff() {
+    this._fails = 0;
+    this.schedule(true);
+  },
+
   stopAll() {
     clearTimeout(this._timer);
+    this._fails = 0;
     this.last = null;
     CameraView.setDetection(null);
   },

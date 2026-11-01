@@ -22,7 +22,10 @@ const CameraView = {
     this.viewport = document.getElementById('camera-viewport');
     this.overlay = document.getElementById('overlay');
     new ResizeObserver(() => this.fit()).observe(this.viewport);
-    this.img.addEventListener('error', () => this.onFeedState && this.onFeedState('error'));
+    this.img.addEventListener('error', () => {
+      clearInterval(this._probe);
+      this.onFeedState && this.onFeedState('error');
+    });
     this.applyView();
   },
 

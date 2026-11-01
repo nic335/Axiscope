@@ -65,7 +65,11 @@
             <div class="camera-empty" id="camera-empty">
               <i data-icon="camera" data-size="28"></i>
               <p id="camera-empty-text">No camera connected</p>
-              <button class="secondary" type="button" data-goto="setup">Connect in Setup <i data-icon="arrow" data-size="14"></i></button>
+              <code class="camera-empty-url" id="camera-empty-url" hidden></code>
+              <div class="camera-empty-actions">
+                <button class="secondary" type="button" id="camera-retry" hidden>Retry</button>
+                <button class="secondary" type="button" data-goto="setup">Connect in Setup <i data-icon="arrow" data-size="14"></i></button>
+              </div>
             </div>
             <span class="camera-tag">CAM <span>·</span> <b id="cam-name">—</b></span>
             <span class="tool-overlay" id="tool-overlay">T– <span>NO TOOL</span></span>
