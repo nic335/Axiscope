@@ -78,6 +78,7 @@ zswitch_y_pos: -18.46     # REQUIRED - Y position of the endstop switch
 zswitch_z_pos: 7.8        # REQUIRED - Z position + some clearance of the endstop switch
 lift_z: 1                 # OPTIONAL - Amount to lift Z before moving (default: 1)
 move_speed: 60            # OPTIONAL - XY movement speed in mm/s (default: 60)
+config_file_path: ~/printer_data/config/axiscope.offsets  # OPTIONAL - file "Save to config file" writes tool offsets to (must be [include]d in printer.cfg, or point it at printer.cfg)
 z_move_speed: 10          # OPTIONAL - Z movement speed in mm/s (default: 10)
 start_gcode: 
   {% set tools = printer.toolchanger.tool_numbers %}
@@ -153,14 +154,18 @@ cors_domains:
 
 ### Initial Setup
 
-1. Access the web interface at `http://your-printer-ip:3000`
-2. Select the printer address you are trying to calibrate, ( will most likely be autofiled soon )
-3. Select the camera to use
-   1. Align `T0` perfectly center to the crosair
-   2. Capture Position
-   3. Change to `Tn`
-      1. Re-Align to center and press X and Y in the side navigator 
-      2. From there your new calculated offset should be 
+1. Open `http://your-printer-ip:3000`. Axiscope looks for Moonraker on the same host (port 80 or 7125) and connects on its own. If it can't find it, enter the address under **Setup**.
+2. If the printer has more than one camera, select the nozzle camera under **Setup**.
+
+### Calibrating XY offsets
+
+1. On **Calibration**, home the printer and pick up `T0` with the tool buttons.
+2. Centre the `T0` nozzle on the crosshair, with **Auto align** or by jogging, then press **Capture reference** (or Enter).
+3. Select `Tn`. Axiscope changes tools and moves the new tool to the captured position.
+4. Centre `Tn` on the crosshair and press **Capture Tn position**. The new offset appears in **Tool offsets**.
+5. Repeat for every tool, then open **Offsets** to review the generated config. Use **Copy config**, or **Save to config file** (this needs `config_file_path`, see below), then run `FIRMWARE_RESTART`.
+
+The animations below show the previous interface, but the steps are the same.
 
 <img style="padding-bottom: 10px;" src="media/T0-Aligment.gif" alt="Alt text" width="500"/><br/>
 <img style="padding-bottom: 10px;" src="media/CapturePosChangeT1.gif" alt="Alt text" width="500"/><br/>
