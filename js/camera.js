@@ -78,4 +78,30 @@ $(document).ready(function() {
     }
     slider.addEventListener('input', updateContrast);
     updateContrast();
+
+    //LED brightness (Ember Prototype V2 camera, optional)
+    const ledSlider = document.getElementById('led-range');
+    let ledSendTimeout = null;
+
+    function sendLedValue(value) {
+        const pwm = (value / 100).toFixed(3);
+        $.get(printerUrl(printerIp, '/printer/gcode/script?script=' +
+            encodeURIComponent('AXISCOPE_SET_LED VALUE=' + pwm)))
+            .fail(function() {
+                console.error('Failed to set LED brightness');
+            });
+    }
+
+    ledSlider.addEventListener('pointerdown', () => {
+        isLedSliderActive = true;
+    });
+
+    ledSlider.addEventListener('input', () => {
+        clearTimeout(ledSendTimeout);
+        ledSendTimeout = setTimeout(() => sendLedValue(ledSlider.value), 200);
+    });
+
+    ledSlider.addEventListener('pointerup', () => {
+        isLedSliderActive = false;
+    });
 });
