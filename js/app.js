@@ -811,7 +811,10 @@ function jog(axis, dir) {
 function capture() {
   const tn = activeTool();
   const p = S.status && S.status.pos;
-  if (tn < 0 || !p || S.busy) return;
+  // Never fail silently: say why nothing was captured.
+  if (!S.online || !p) { notice('Nothing captured: no position from the printer yet. Check the connection.', 'error'); return; }
+  if (S.busy) { notice('Nothing captured: an auto alignment is still running. Wait for it, or cancel it.', 'error'); return; }
+  if (tn < 0) { notice('Nothing captured: no tool is picked up. Select a tool first.', 'error'); return; }
   if (tn === 0) {
     S.ref = { x: +p[0].toFixed(3), y: +p[1].toFixed(3), z: +p[2].toFixed(3) };
     notice('Reference captured at X ' + S.ref.x.toFixed(3) + ' Y ' + S.ref.y.toFixed(3) + '. Select another tool to continue.');
@@ -923,7 +926,10 @@ function initEvents() {
   $('capture').addEventListener('click', capture);
   document.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || S.tab !== 'calibration' || e.repeat) return;
-    if (e.target.closest('input, textarea, select, button, summary, a')) return;
+    // After clicking a jog arrow it keeps focus, and Enter would jog again;
+    // the capture button promises Enter (↵), so capture instead.
+    const jogFocus = e.target.closest('.jog[data-jog], #increments button');
+    if (!jogFocus && e.target.closest('input, textarea, select, button, summary, a')) return;
     e.preventDefault();
     capture();
   });
