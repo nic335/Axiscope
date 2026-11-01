@@ -160,9 +160,9 @@ body { background: var(--canvas, #101211); }
 .minicam[data-corner="tr"] { right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); }
 .minicam[data-corner="tl"] { left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); }
 .minicam.dragging { right: auto !important; bottom: auto !important; opacity: .9; }
-.minicam-head { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 8px; border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; }
+.minicam-head { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 6px 4px 8px; background: repeating-linear-gradient(90deg, transparent 0 3px, color-mix(in srgb, var(--line) 35%, transparent) 3px 4px); border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; }
 .minicam.dragging .minicam-head { cursor: grabbing; }
-.minicam-head select { flex: 1; min-width: 0; background: var(--canvas); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 11px monospace; padding: 4px 6px; color-scheme: dark; }
+.minicam-head select { flex: 0 1 auto; width: auto; max-width: 55%; min-width: 0; margin-right: auto; background: var(--canvas); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 10px monospace; padding: 2px 4px; color-scheme: dark; cursor: pointer; }
 .minicam-btn { border: 0; background: none; color: #b8c2b2; font-size: 18px; line-height: 1; padding: 0 6px; }
 .minicam-body { cursor: grab; touch-action: none; user-select: none; }
 .minicam.dragging .minicam-body { cursor: grabbing; }
