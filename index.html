@@ -19,6 +19,7 @@
       <button id="nav-setup" data-tab="setup" type="button"><i data-icon="power" data-size="16"></i>Setup</button>
     </nav>
     <div class="top-right">
+      <button type="button" class="chip-btn minicam-toggle" id="minicam-toggle" aria-pressed="false" aria-controls="minicam" title="Show a second camera in a corner"><i data-icon="camera" data-size="14"></i>Minicam</button>
       <span class="demo-label" id="conn-label">OFFLINE</span>
       <a href="https://github.com/nic335/Axiscope/blob/main/README.md" target="_blank" rel="noreferrer" aria-label="Open Axiscope documentation"><i data-icon="book"></i></a>
     </div>
@@ -328,12 +329,25 @@
       <span>AXISCOPE <span class="muted">/</span> BUILT FOR ALIGNMENT</span>
     </footer>
   </main>
+<aside class="minicam" id="minicam" data-corner="br" aria-label="Minicam" hidden>
+  <div class="minicam-head" id="minicam-head" title="Drag the window to another corner">
+    <select id="minicam-select" aria-label="Minicam camera"></select>
+    <button type="button" class="minicam-btn" id="minicam-close" aria-label="Close minicam">×</button>
+  </div>
+  <div class="minicam-body">
+    <img id="minicam-img" alt="Minicam feed">
+    <p class="minicam-empty" id="minicam-empty">No camera</p>
+    <span class="minicam-resize" id="minicam-resize" role="separator" aria-label="Resize minicam" tabindex="0" title="Drag to resize (arrow keys work too)"></span>
+  </div>
+</aside>
 </div>
+
 
 <script src="./js/icons.js"></script>
 <script src="./js/printer.js"></script>
 <script src="./js/camera.js"></script>
 <script src="./js/app.js"></script>
 <script src="./js/vision.js"></script>
+<script src="./js/minicam.js"></script>
 </body>
 </html>

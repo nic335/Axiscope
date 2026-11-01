@@ -165,6 +165,12 @@ cors_domains:
 4. Centre `Tn` on the crosshair and press **Capture Tn position**. The new offset appears in **Tool offsets**.
 5. Repeat for every tool, then open **Offsets** to review the generated config. Use **Copy config**, or **Save to config file** (this needs `config_file_path`, see below), then run `FIRMWARE_RESTART`.
 
+### Cameras and minicam
+
+Axiscope lists the cameras from Moonraker (the ones Mainsail or Fluidd show) and also the `[cam ...]` sections in `crowsnest.conf`, so cameras that were never added to the web UI still appear. You can also add any MJPEG stream under **Setup → Add a camera by stream URL**.
+
+**Minicam** in the top bar opens a second camera, such as a chamber cam, in a small window. Drag it to any corner, resize it from its inner corner, and pick its camera from the dropdown.
+
 The animations below show the previous interface, but the steps are the same.
 
 <img style="padding-bottom: 10px;" src="media/T0-Aligment.gif" alt="Alt text" width="500"/><br/>

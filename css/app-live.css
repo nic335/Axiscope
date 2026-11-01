@@ -152,6 +152,36 @@ body { background: var(--canvas, #101211); }
 .setup-panel > .secondary { margin-top: 14px; }
 #led-template { margin-bottom: 4px; }
 
+/* ---- minicam ---- */
+.minicam-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.minicam { position: fixed; z-index: 60; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: min(var(--radius), 10px); overflow: hidden; box-shadow: 0 12px 32px rgba(0, 0, 0, .45); max-width: calc(100vw - 32px); }
+.minicam[data-corner="br"] { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.minicam[data-corner="bl"] { left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.minicam[data-corner="tr"] { right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); }
+.minicam[data-corner="tl"] { left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); }
+.minicam.dragging { right: auto !important; bottom: auto !important; opacity: .9; }
+.minicam-head { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 8px; border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; user-select: none; }
+.minicam.dragging .minicam-head { cursor: grabbing; }
+.minicam-head select { flex: 1; min-width: 0; background: var(--canvas); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 11px monospace; padding: 4px 6px; color-scheme: dark; }
+.minicam-btn { border: 0; background: none; color: #b8c2b2; font-size: 18px; line-height: 1; padding: 0 6px; }
+.minicam-body { cursor: grab; touch-action: none; user-select: none; }
+.minicam.dragging .minicam-body { cursor: grabbing; }
+.minicam-body { position: relative; aspect-ratio: 16 / 9; background: #0c0f0c; }
+.minicam-body img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.minicam-empty { position: absolute; inset: 0; display: grid; place-items: center; font: 11px monospace; color: #858e82; margin: 0; }
+.minicam-resize { position: absolute; width: 16px; height: 16px; z-index: 1; touch-action: none; opacity: .7; }
+.minicam-resize::before { content: ''; position: absolute; inset: 3px; border: 0 solid var(--accent); }
+.minicam[data-corner="br"] .minicam-resize { left: 0; top: 0; cursor: nwse-resize; }
+.minicam[data-corner="br"] .minicam-resize::before { border-left-width: 2px; border-top-width: 2px; }
+.minicam[data-corner="bl"] .minicam-resize { right: 0; top: 0; cursor: nesw-resize; }
+.minicam[data-corner="bl"] .minicam-resize::before { border-right-width: 2px; border-top-width: 2px; }
+.minicam[data-corner="tr"] .minicam-resize { left: 0; bottom: 0; cursor: nesw-resize; }
+.minicam[data-corner="tr"] .minicam-resize::before { border-left-width: 2px; border-bottom-width: 2px; }
+.minicam[data-corner="tl"] .minicam-resize { right: 0; bottom: 0; cursor: nwse-resize; }
+.minicam[data-corner="tl"] .minicam-resize::before { border-right-width: 2px; border-bottom-width: 2px; }
+.minicam-resize:hover, .minicam-resize:focus-visible { opacity: 1; outline: none; }
+.minicam-resize:focus-visible::before { inset: 1px; }
+
 @media (max-width: 1100px) {
   .detection-advanced-body .detection-ranges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -160,5 +190,6 @@ body { background: var(--canvas, #101211); }
   .camera-option img { width: 88px; }
   .contrast-control input { width: 70px; }
   .align-steps li { grid-template-columns: 64px 1fr; }
+  .minicam-toggle { font-size: 0; gap: 0; padding: 5px 7px; }
 }
 @media (prefers-reduced-motion: reduce) { .camera-stage, .camera-stage img { transition: none; } }

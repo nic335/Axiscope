@@ -358,6 +358,7 @@ function renderCameraList() {
   }));
   list.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => selectCamera(S.cameras[Number(b.dataset.cam)])));
   $('rescan-cameras').addEventListener('click', refreshCameras);
+  if (window.Minicam && Minicam.el) Minicam.refresh();
 }
 
 async function addManualCamera(e) {
