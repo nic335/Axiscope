@@ -108,7 +108,7 @@
             <div class="detection-heading">
               <div>
                 <h3 id="detection-title">◎ Circle detection <small id="det-engine">OPENCV</small></h3>
-                <p id="det-sub">Edge detection, then a search for concentric circles on the live frame</p>
+                <p id="det-sub">Edge detection, then a search for concentric circles. Click the nozzle in the image to lock onto it.</p>
               </div>
               <label class="detection-switch"><input id="detection-enabled" type="checkbox" role="switch" aria-label="Circle detection"><span id="det-onoff">Off</span></label>
             </div>
@@ -119,7 +119,8 @@
                 <div data-dial="hough_votes"></div>
               </div>
               <div class="detection-result">
-                <span id="detection-status" role="status">Waiting for a frame…</span>
+                <span class="detection-status-wrap"><span id="detection-status" role="status">Waiting for a frame…</span>
+                  <button type="button" class="text-button" id="lock-release" hidden>Release lock</button></span>
                 <div class="detection-buttons">
                   <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, and turn the view to match the machine">Check orientation</button>
                   <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
@@ -140,6 +141,7 @@
                     <label class="toggle-label"><input id="circle-edges" type="checkbox" role="switch">Show edge map</label>
                     <button id="detection-reset" class="text-button" type="button">Reset tuning</button>
                   </div>
+                  <p><b>Canny high</b> is how strong a brightness change must be to <i>start</i> an edge; <b>Canny low</b> is how weak it may get while <i>continuing</i> one. Raise both if speckles and texture light up; lower them if the nozzle's rings break into pieces. Keep low at roughly a third to a half of high.</p>
                   <p>Radii are source-image pixels, independent of zoom. A nozzle usually shows two or more rings (orifice and tip face); requiring concentric rings rejects stray single circles. Use the edge map to tune Canny and blur: the rings should be clean, unbroken lines.</p>
                 </div>
               </details>

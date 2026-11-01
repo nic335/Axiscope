@@ -75,8 +75,9 @@ def api_detect():
     except HardwareError as e:
         return _error(str(e), 502)
     hint = body.get('hint')
+    lock = body.get('lock') if isinstance(body.get('lock'), dict) else None
     res = detect(img, body.get('params'), hint=tuple(hint) if hint else None,
-                 want_edges=bool(body.get('edges')))
+                 want_edges=bool(body.get('edges')), lock=lock)
     if res.get('edges_jpeg') is not None:
         res['edges'] = 'data:image/jpeg;base64,' + base64.b64encode(res.pop('edges_jpeg')).decode()
     res.pop('edges_jpeg', None)
@@ -104,6 +105,7 @@ def api_align_start():
                 camera_key=camera_url,
                 tool=body.get('tool'),
                 mode=body.get('mode', 'align'),
+                lock=body.get('lock'),
             )
         except HardwareError as e:
             return _error(str(e))

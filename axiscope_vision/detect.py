@@ -284,12 +284,16 @@ def _evaluate(index, cx, cy, params):
     }
 
 
-def detect(img, params=None, hint=None, want_edges=False):
+def detect(img, params=None, hint=None, want_edges=False, lock=None):
     """
     Find the nozzle in a BGR image.
 
     hint: optional (x, y) where the nozzle is expected; it becomes a
           candidate and breaks ties between similar candidates.
+    lock: optional target to stay on, {"x", "y", "radius", "rings": [r, ...]}
+          (all optional). A candidate within `radius` of (x, y) that shares a
+          ring radius with `rings` wins over any stronger circle elsewhere.
+          out["locked"] says whether the lock was found.
 
     Returns a dict with image size, the best detection (or None), the other
     candidates and timing information.
@@ -306,11 +310,19 @@ def detect(img, params=None, hint=None, want_edges=False):
         img = cv2.resize(img, (int(round(W * scale)), int(round(H * scale))), interpolation=cv2.INTER_AREA)
         if hint is not None:
             hint = ((hint[0] + 0.5) * scale - 0.5, (hint[1] + 0.5) * scale - 0.5)
+    if lock:
+        lock = dict(lock)
+        if lock.get("x") is not None and lock.get("y") is not None:
+            lock["x"] = (float(lock["x"]) + 0.5) * scale - 0.5
+            lock["y"] = (float(lock["y"]) + 0.5) * scale - 0.5
+        if lock.get("radius") is not None:
+            lock["radius"] = float(lock["radius"]) * scale
+        lock["rings"] = [float(r) * scale for r in (lock.get("rings") or [])]
     q = dict(p)
     q["min_radius"] = max(2, int(round(p["min_radius"] * scale)))
     q["max_radius"] = max(q["min_radius"] + 1, int(round(p["max_radius"] * scale)))
     q["min_ring_gap"] = max(1.5, p["min_ring_gap"] * scale)
-    out = _detect_scaled(img, q, hint, want_edges)
+    out = _detect_scaled(img, q, hint, want_edges, lock)
     for r in ([out["best"]] if out["best"] else []) + out["candidates"]:
         # INTER_AREA maps source pixel centre x to (x + 0.5) * scale - 0.5.
         r["x"] = (r["x"] + 0.5) / scale - 0.5
@@ -324,7 +336,26 @@ def detect(img, params=None, hint=None, want_edges=False):
     return out
 
 
-def _detect_scaled(img, p, hint, want_edges):
+def _lock_match(r, lock):
+    """(matches lock?, bonus) for a candidate against a lock."""
+    bonus, near = 0.0, True
+    if lock.get("x") is not None and lock.get("y") is not None:
+        radius = max(1.0, float(lock.get("radius") or 50.0))
+        d = math.hypot(r["x"] - lock["x"], r["y"] - lock["y"])
+        near = d <= radius
+        bonus += 2.0 * max(0.0, 1.0 - d / radius)
+    rings = lock.get("rings") or []
+    shared = sum(1 for b in rings if any(abs(a["r"] - b) <= max(2.0, 0.08 * b) for a in r["rings"]))
+    if not rings:
+        return near, bonus
+    bonus += 2.0 * shared / len(rings)
+    # One matching radius is a coincidence; a matching set is the same part.
+    # Without a position to go on, demand the stronger evidence.
+    need = 1 if (lock.get("x") is not None) else min(2, len(rings))
+    return near and shared >= need, bonus
+
+
+def _detect_scaled(img, p, hint, want_edges, lock=None):
     h, w = img.shape[:2]
     gray = preprocess(img, p)
     edges = cv2.Canny(gray, p["canny_low"], p["canny_high"], L2gradient=True)
@@ -341,6 +372,8 @@ def _detect_scaled(img, p, hint, want_edges):
     else:
         seeds += _hough_candidates(gray, p)
         seeds += _contour_candidates(edges, p)
+    if lock and lock.get("x") is not None and lock.get("y") is not None:
+        seeds.insert(0, (float(lock["x"]), float(lock["y"])))
     seeds.append((w / 2.0, h / 2.0))
 
     results = []
@@ -365,6 +398,18 @@ def _detect_scaled(img, p, hint, want_edges):
 
     eligible = [r for r in results if r["concentric"] or not p["require_concentric"]]
     best = eligible[0] if eligible else None
+    locked = None
+    if lock:
+        # Stay on the locked target when it is still there, even if another
+        # circle scores higher in this particular frame.
+        matches = []
+        for r in eligible:
+            ok, bonus = _lock_match(r, lock)
+            if ok:
+                matches.append((r["rank"] + bonus, r))
+        locked = bool(matches)
+        if matches:
+            best = max(matches, key=lambda m: m[0])[1]
 
     out = {
         "width": int(w),
@@ -373,6 +418,7 @@ def _detect_scaled(img, p, hint, want_edges):
         "candidates": [r for r in results if r is not best][:6],
         "edge_pixels": int(len(index.x)),
         "warning": warning,
+        "locked": locked,
     }
     if want_edges:
         ok, jpg = cv2.imencode(".jpg", edges, [cv2.IMWRITE_JPEG_QUALITY, 70])

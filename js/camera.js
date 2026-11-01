@@ -11,6 +11,7 @@ const CameraView = {
   detection: null,      // last detection result {best, candidates, width, height}
   showOverlay: true,
   onFrameSize: null,
+  onPick: null,         // (x, y) in source pixels when the image is clicked
   onFeedState: null,
   _probe: null,
 
@@ -22,6 +23,11 @@ const CameraView = {
     this.viewport = document.getElementById('camera-viewport');
     this.overlay = document.getElementById('overlay');
     new ResizeObserver(() => this.fit()).observe(this.viewport);
+    this.viewport.addEventListener('click', e => {
+      if (!this.onPick || e.target.closest('button, a')) return;
+      const pt = this.toSource(e.clientX, e.clientY);
+      if (pt) this.onPick(pt[0], pt[1]);
+    });
     this.img.addEventListener('error', () => {
       clearInterval(this._probe);
       this.onFeedState && this.onFeedState('error');
@@ -106,6 +112,16 @@ const CameraView = {
     this.draw();
   },
 
+  // Screen point -> source-image pixel, through zoom, flip and rotation.
+  toSource(clientX, clientY) {
+    const f = this.frame;
+    const ctm = this.overlay.getScreenCTM();
+    if (!f || !ctm) return null;
+    const pt = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse());
+    if (pt.x < 0 || pt.y < 0 || pt.x > f.width || pt.y > f.height) return null;
+    return [pt.x, pt.y];
+  },
+
   target() {
     const f = this.frame;
     return f ? [f.width / 2, f.height / 2] : null;
@@ -145,7 +161,7 @@ const CameraView = {
     });
     const b = det.best;
     if (!b) return;
-    const g = el('g', { class: 'ov-detected', id: 'detected-circle' });
+    const g = el('g', { class: 'ov-detected' + (det.locked ? ' is-locked' : ''), id: 'detected-circle' });
     b.rings.forEach(ring => el('circle', { cx: b.x * kx, cy: b.y * ky, r: ring.r * kx }, g));
     const t = Math.max(6, H * 0.012);
     el('path', { d: `M${b.x * kx - t} ${b.y * ky}h${2 * t}M${b.x * kx} ${b.y * ky - t}v${2 * t}` }, g);

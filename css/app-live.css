@@ -23,6 +23,10 @@ body { background: var(--canvas, #101211); }
 .ov-crosshair { stroke: var(--accent); stroke-width: .8; opacity: .8; fill: none; }
 .ov-detected { stroke: var(--accent); stroke-width: 1.6; fill: none; }
 .ov-detected circle { stroke-dasharray: 5 3; }
+.ov-detected.is-locked circle { stroke-dasharray: none; }
+.camera-viewport.can-pick { cursor: crosshair; }
+.detection-status-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.detection-status-wrap .text-button { font-size: 10px; }
 .ov-candidate { stroke: #a3ac9f; stroke-width: 1; fill: none; opacity: .45; stroke-dasharray: 2 4; }
 .ov-error { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 3 3; }
 .camera-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: #858e82; text-align: center; padding: 20px; }

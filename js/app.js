@@ -422,6 +422,7 @@ function selectCamera(cam, { keepView = false, stay = false } = {}) {
     LS.set('view', S.view);
   }
   CameraView.setStream(cam.stream);
+  Vision.releaseLock();
   Vision.resetBackoff();
   CameraView.applyView();
   renderCameraList();

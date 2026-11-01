@@ -256,3 +256,69 @@ def test_tracking_survives_rings_appearing_at_frame_edge():
     a.run()
     st = a.snapshot()
     assert st["state"] == "converged", st["message"]
+
+
+# --- target lock: a stronger circle elsewhere must not steal the target ---
+import cv2  # noqa: E402
+
+DECOY = (1050.0, 180.0)
+
+
+def add_decoy(img):
+    # A static, high-contrast concentric target (e.g. a screw head) with more
+    # rings than the nozzle, so it outscores it when nothing is locked.
+    for r, v in ((70, 230), (52, 20), (36, 230), (22, 20), (10, 230)):
+        cv2.circle(img, (int(DECOY[0]), int(DECOY[1])), r, (v, v, v), -1, cv2.LINE_AA)
+    return img
+
+
+class DecoyRig(SimRig):
+    def frame(self):
+        return add_decoy(super().frame())
+
+
+def test_unlocked_detection_prefers_the_decoy():
+    img = add_decoy(render_nozzle(500, 420, seed=3))
+    best = detect(img, PARAMS)["best"]
+    assert np.hypot(best["x"] - DECOY[0], best["y"] - DECOY[1]) < 3   # the problem
+
+
+def test_lock_keeps_the_nozzle_over_a_stronger_circle():
+    img = add_decoy(render_nozzle(500, 420, seed=3))
+    out = detect(img, PARAMS, lock={"x": 505, "y": 415, "radius": 60})
+    assert out["locked"] is True
+    assert np.hypot(out["best"]["x"] - 500, out["best"]["y"] - 420) < 0.5
+    # A lock on ring sizes alone (no position) also picks the nozzle.
+    out = detect(img, PARAMS, lock={"rings": [16, 55, 90]})
+    assert np.hypot(out["best"]["x"] - 500, out["best"]["y"] - 420) < 0.5
+
+
+def test_lock_lost_falls_back_and_reports_it():
+    img = add_decoy(render_nozzle(500, 420, seed=3))
+    out = detect(img, PARAMS, lock={"x": 200, "y": 600, "radius": 40})
+    assert out["locked"] is False and out["best"] is not None
+
+
+def test_autoalign_stays_on_locked_nozzle_with_decoy_in_view():
+    rig = DecoyRig(start=(150.3, 149.8))
+    p0 = rig.nozzle_px()
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.005),
+                    lock={"x": float(p0[0]), "y": float(p0[1]), "radius": 60})
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    assert np.hypot(*(rig.nozzle_px() - [rig.w / 2, rig.h / 2])) < 3
+
+
+def test_probe_out_of_view_with_decoy_retries_instead_of_taking_decoy():
+    # Reported sequence: nozzle near the frame edge, a stronger circle in view.
+    # The +X probe pushes the nozzle out; the run must not jump to the decoy.
+    rig = DecoyRig(angle_deg=90, mirror=True, start=(150.7, 149.8))
+    p0 = rig.nozzle_px()
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.005),
+                    lock={"x": float(p0[0]), "y": float(p0[1]), "radius": 60})
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    assert any("other side" in s["message"] for s in st["steps"])
+    assert np.hypot(*(rig.nozzle_px() - [rig.w / 2, rig.h / 2])) < 3

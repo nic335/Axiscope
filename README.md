@@ -206,6 +206,8 @@ Axiscope can find and centre the nozzle for you. Detection and motion run on the
    - **Correct and repeat**: moves the nozzle onto the crosshair, re-scans and corrects again until it is within tolerance, at most *N* times.
 4. Check the camera view and confirm with **Accept & capture**, or use **Revert move** or **Run again**. Nothing is captured without your confirmation.
 
+**Picking the right circle.** Live detection locks onto the nozzle and follows it, instead of jumping to whichever circle looks strongest in each frame. If it picks something else (a screw head, a reflection), click the nozzle in the camera image to lock onto it; **Release lock** undoes that. Auto align starts from the locked target and, after every move, only looks where the nozzle should now be.
+
 **Camera mounted sideways or mirrored?** Press **Check orientation**. Axiscope moves 0.5 mm in X and in Y, watches where the nozzle goes in the image, moves back and checks it returns to the same pixel. It reports the result in plain terms ("+X moves the image down, +Y moves it right") and turns the camera view so +X points right and +Y up on screen, which makes the jog arrows match the picture. This only changes the display; detection and alignment always use the raw frame, so they work with any camera orientation. **Rotate** and **Flip H/V** under the camera adjust the view by hand.
 
 If a run behaves oddly, press **Copy log** in the result panel and include it in a bug report; it lists every measurement, the learned mapping and the settings.

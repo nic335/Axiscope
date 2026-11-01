@@ -36,6 +36,12 @@ const Vision = {
   _timer: null,
   _inflight: false,
   _fails: 0,            // consecutive detection failures, for backoff
+  // Target lock: keeps live detection on one nozzle instead of jumping to
+  // whichever circle scores best in each frame. {x, y, radius, rings}; x/y
+  // are dropped (ring-size search) when the target moved out of the radius.
+  lock: null,
+  userLock: false,      // set by clicking the image; never dropped automatically
+  _lockMisses: 0,
   _jobTimer: null,
 
   init() {
@@ -148,6 +154,8 @@ const Vision = {
       this.kick();
     });
     $('auto-align').addEventListener('click', () => this.startAlign());
+    $('lock-release').addEventListener('click', () => this.releaseLock());
+    CameraView.onPick = (x, y) => { if (this.settings.enabled && !S.busy) this.lockAt(x, y); };
     $('check-orientation').addEventListener('click', () => this.startAlign('orient'));
     $('align-orient').addEventListener('click', () => {
       const r = this.job && this.job.result;
@@ -243,9 +251,10 @@ const Vision = {
     if (this._inflight || !this.shouldDetect()) return;
     this._inflight = true;
     try {
-      const res = await Api.detect({ camera_url: S.camera.snapshot, params: this.params(), edges: this.settings.edges });
+      const res = await Api.detect({ camera_url: S.camera.snapshot, params: this.params(), edges: this.settings.edges, lock: this.lock });
       this.last = res;
       this._fails = 0;
+      this.updateLock(res);
       if (this.shouldDetect()) CameraView.setDetection(res, this.settings.edges ? res.edges : null);
       this.renderDetection(res);
     } catch (e) {
@@ -261,6 +270,46 @@ const Vision = {
     }
   },
 
+  // Follow the target from frame to frame (see `lock` above).
+  updateLock(res) {
+    const b = res.best;
+    const rings = b ? b.rings.map(r => r.r) : [];
+    const follow = () => {
+      const rmax = Math.max(...rings);
+      this.lock = { x: b.x, y: b.y, radius: Math.max(40, 0.6 * rmax), rings };
+      this._lockMisses = 0;
+    };
+    if (!this.lock) { if (b) follow(); return; }
+    if (res.locked && b) { follow(); return; }
+    // Lost: first look for the same ring set anywhere (a big jog moved it),
+    // then, for an automatic lock, start over on the best circle.
+    if (this.lock.x != null && this.lock.rings && this.lock.rings.length) {
+      this.lock = { rings: this.lock.rings };
+      return;
+    }
+    if (++this._lockMisses >= 3 && !this.userLock) {
+      this.lock = null;
+      if (b) follow();
+    }
+  },
+
+  lockAt(x, y) {
+    const f = CameraView.frame;
+    this.lock = { x, y, radius: Math.max(60, 0.08 * (f ? f.height : 720)), rings: [] };
+    this.userLock = true;
+    this._lockMisses = 0;
+    $('lock-release').hidden = false;
+    notice('Locked onto the circle at the click. Detection and auto align stay on it.');
+    this.schedule(true);
+  },
+
+  releaseLock() {
+    this.lock = null;
+    this.userLock = false;
+    $('lock-release').hidden = true;
+    this.schedule(true);
+  },
+
   renderDetection(res) {
     const el = $('detection-status');
     const b = res && res.best;
@@ -273,7 +322,8 @@ const Vision = {
     const kx = CameraView.frame && res.width ? CameraView.frame.width / res.width : 1;
     const d = t ? Math.hypot(b.x * kx - t[0], b.y * kx - t[1]) / kx : 0;
     const radii = b.rings.map(r => Math.round(r.r)).join('/');
-    el.textContent = `${b.rings.length} ring${b.rings.length === 1 ? '' : 's'} · r ${radii} px · ${d.toFixed(1)} px from crosshair · ${Math.round(res.ms)} ms`;
+    const lockNote = !this.userLock ? '' : res.locked ? ' · locked' : ' · locked target not found, showing best circle';
+    el.textContent = `${b.rings.length} ring${b.rings.length === 1 ? '' : 's'} · r ${radii} px · ${d.toFixed(1)} px from crosshair · ${Math.round(res.ms)} ms${lockNote}`;
   },
 
   renderEligibility() {
@@ -293,6 +343,7 @@ const Vision = {
       $(id).title = why;
     });
     $('jog-align-circle').classList.toggle('detection-active', this.settings.enabled);
+    $('camera-viewport').classList.toggle('can-pick', this.settings.enabled && !S.busy);
   },
 
   // ------------------------------------------------------- auto alignment
@@ -311,6 +362,8 @@ const Vision = {
         target: CameraView.target(),
         tool,
         mode,
+        // Start from the locked target when its position is known.
+        lock: this.lock && this.lock.x != null ? this.lock : null,
       });
       this.showJob(job);
       // The panel sits below the camera; bring it into view.
@@ -442,6 +495,8 @@ const Vision = {
   stopAll() {
     clearTimeout(this._timer);
     this._fails = 0;
+    this.lock = null;
+    this.userLock = false;
     this.last = null;
     CameraView.setDetection(null);
   },

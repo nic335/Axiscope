@@ -109,7 +109,7 @@ class AutoAligner:
     """Runs one alignment. Thread-safe status via snapshot()."""
 
     def __init__(self, printer, camera, detect_params=None, settings=None,
-                 target=None, camera_key=None, tool=None, mode="align"):
+                 target=None, camera_key=None, tool=None, mode="align", lock=None):
         self.printer = printer
         self.camera = camera
         self.detect_params = detect_params or {}
@@ -118,6 +118,8 @@ class AutoAligner:
         self.camera_key = camera_key
         self.tool = tool
         self.mode = "orient" if mode == "orient" else "align"
+        # Target the user locked in the live view: the first scan stays on it.
+        self.initial_lock = lock if isinstance(lock, dict) else None
         self._settle_note = ""
         self._lock = threading.Lock()
         self._cancel = threading.Event()
@@ -179,7 +181,19 @@ class AutoAligner:
         if s["settle"]:
             time.sleep(s["settle"])
 
-    def _wait_stable(self, hint, ref, before, min_departure):
+    @staticmethod
+    def _ring_lock(ref):
+        """Lock on the reference nozzle's ring sizes, anywhere in the frame."""
+        return {"rings": [r["r"] for r in ref["rings"]]} if ref else None
+
+    def _track_lock(self, ref, predicted, expected_px):
+        """Lock near where the nozzle should be after a move."""
+        r_main = max(r["r"] for r in ref["rings"])
+        radius = max(25.0, 0.3 * r_main + 0.5 * float(np.hypot(*expected_px)))
+        return {"x": float(predicted[0]), "y": float(predicted[1]), "radius": radius,
+                "rings": [r["r"] for r in ref["rings"]]}
+
+    def _wait_stable(self, hint, ref, before, min_departure, lock=None):
         """After a move, grab frames until the image has caught up with it.
 
         Cameras buffer frames, so the first snapshots after a move can still
@@ -195,9 +209,11 @@ class AutoAligner:
         prev, frames = None, 0
         while time.time() < deadline:
             self._check_cancel()
-            res = detect(self.camera.frame(), self.detect_params, hint=hint)
+            res = detect(self.camera.frame(), self.detect_params, hint=hint, lock=lock)
             frames += 1
             b = res["best"]
+            if lock and res.get("locked") is False:
+                b = None
             if b is None or (ref is not None and not self._same_nozzle(ref, b)):
                 continue
             p = np.array([b["x"], b["y"]])
@@ -209,7 +225,7 @@ class AutoAligner:
             prev, hint = p, (b["x"], b["y"])
         return frames, False
 
-    def _measure(self, hint=None, ref=None, before=None, min_departure=0.0):
+    def _measure(self, hint=None, ref=None, before=None, min_departure=0.0, lock=None):
         """Median nozzle centre over several fresh frames, or None.
 
         With `before` set (a move just happened), first wait for the camera
@@ -217,7 +233,7 @@ class AutoAligner:
         s = self.settings
         self._settle_note = ""
         if before is not None:
-            frames, ok = self._wait_stable(hint, ref, before, min_departure)
+            frames, ok = self._wait_stable(hint, ref, before, min_departure, lock)
             if not ok:
                 self._settle_note = " (image still changing after %.0f s)" % s["stable_timeout"]
             elif frames > 2:
@@ -226,9 +242,11 @@ class AutoAligner:
         for i in range(s["samples"]):
             self._check_cancel()
             img = self.camera.frame()
-            res = detect(img, self.detect_params, hint=hint)
+            res = detect(img, self.detect_params, hint=hint, lock=lock)
             last = res
             b = res["best"]
+            if lock and res.get("locked") is False:
+                b = None   # the tracked nozzle is not in this frame; don't take another circle
             if b is not None and ref is not None and not self._same_nozzle(ref, b):
                 b = None
             if b is not None:
@@ -255,8 +273,11 @@ class AutoAligner:
         """Guard against jumping to another circle: at least one ring radius
         must match. (Not "the largest ring": outer rings come and go when the
         nozzle nears the frame edge or the edge is rough.)"""
-        return any(abs(ra["r"] - rb["r"]) <= max(3.0, 0.08 * ra["r"])
-                   for ra in ref["rings"] for rb in b["rings"])
+        shared = sum(1 for ra in ref["rings"]
+                     if any(abs(ra["r"] - rb["r"]) <= max(3.0, 0.08 * ra["r"]) for rb in b["rings"]))
+        # One equal radius can be a coincidence (a screw head, a bearing);
+        # two matching rings make it the same part.
+        return shared >= min(2, len(ref["rings"]), len(b["rings"]))
 
     def _probe(self, axis, p_from, ref):
         """Move `axis` by the probe distance, return (image delta per mm, new pixel)."""
@@ -267,7 +288,8 @@ class AutoAligner:
             move[axis] = d * sign if sign > 0 else -2.0 * d
             self._move(*move)
             # Expect the image to move at least a few pixels for a probe move.
-            p, _ = self._measure(hint=None, ref=ref, before=p_from, min_departure=3.0)
+            p, _ = self._measure(hint=None, ref=ref, before=p_from, min_departure=3.0,
+                                 lock=self._ring_lock(ref))
             if p is not None:
                 return (p - p_from) / (d * sign), p
             self._step("probe_%s" % "xy"[axis],
@@ -297,8 +319,9 @@ class AutoAligner:
         nx, ny = np.hypot(*J[:, 0]), np.hypot(*J[:, 1])
         if min(nx, ny) < MIN_PX_PER_MM:
             raise AlignError(
-                "The nozzle barely moved in the image (%.1f / %.1f px per mm). "
-                "Is the camera feed live, and is this the nozzle camera?" % (nx, ny))
+                "The tracked circle barely moved in the image (%.1f / %.1f px per mm), so it "
+                "is not on the moving nozzle. Click the nozzle in the camera image to lock onto "
+                "it, and check that the camera feed is live." % (nx, ny))
         cos = abs(float(J[:, 0] @ J[:, 1])) / (nx * ny)
         skew = 90.0 - math.degrees(math.acos(min(1.0, cos)))
         if skew > MAX_SKEW_DEG:
@@ -335,7 +358,7 @@ class AutoAligner:
         self._set(start_position=start)
 
         self._step("scan", "Scanning for concentric circles")
-        p, res = self._measure()
+        p, res = self._measure(lock=self.initial_lock)
         if p is None:
             msg = "No nozzle found in the camera view."
             if res and res.get("warning"):
@@ -407,6 +430,7 @@ class AutoAligner:
             expected = J @ move
             predicted = p + expected
             p_new, _ = self._measure(hint=tuple(predicted), ref=ref, before=p,
+                                     lock=self._track_lock(ref, predicted, expected),
                                      min_departure=0.5 * float(np.hypot(*expected)))
             if p_new is None:
                 raise AlignError("Lost the nozzle after correction %d." % corrections)
@@ -459,6 +483,7 @@ class AutoAligner:
         self._move(*back)
         expected = J @ back
         p_back, _ = self._measure(hint=tuple(p + expected), ref=ref, before=p,
+                                  lock=self._track_lock(ref, p + expected, expected),
                                   min_departure=0.5 * float(np.hypot(*expected)))
         if p_back is None:
             raise AlignError("Lost the nozzle when moving back to the start.")

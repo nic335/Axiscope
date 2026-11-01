@@ -193,10 +193,16 @@ def query():
     return jsonify(result={"status": {k: v for k, v in st.items() if k in names}})
 
 
+DECOY = os.environ.get("MOCK_DECOY") == "1"   # a fixed, stronger concentric target in view
+
+
 def jpeg():
     with lock:
         x, y = nozzle_px()
     img = render_nozzle(x, y, W, H, noise=5, seed=int(time.time() * 1000) % 100000)
+    if DECOY:
+        for r, v in ((70, 230), (52, 20), (36, 230), (22, 20), (10, 230)):
+            cv2.circle(img, (1100, 150), r, (v, v, v), -1, cv2.LINE_AA)
     return cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes()
 
 
@@ -231,7 +237,8 @@ app.add_url_rule("/webcam/", "webcam", streamer(jpeg).view_functions["index"])
 
 @app.route("/_mock/state")
 def mock_state():
-    return jsonify(tool=state["tool"], gcode=gcode_pos(), saved=state["saved_offsets"], true=TRUE_OFFSETS)
+    return jsonify(tool=state["tool"], gcode=gcode_pos(), saved=state["saved_offsets"], true=TRUE_OFFSETS,
+                   nozzle_px=[float(v) for v in nozzle_px()])
 
 
 if __name__ == "__main__":
