@@ -78,10 +78,8 @@ const Printer = {
 
   cameraUrls(cam) {
     const stream = this.resolveCameraUrl(cam.stream_url || '/webcam/?action=stream');
-    const snapshot = cam.snapshot_url
-      ? this.resolveCameraUrl(cam.snapshot_url)
-      : stream.replace('action=stream', 'action=snapshot');
-    return { stream, snapshot };
+    const snapshot = cam.snapshot_url ? this.resolveCameraUrl(cam.snapshot_url) : null;
+    return mjpegUrls(stream, snapshot);
   },
 
   // [cam ...] sections of crowsnest.conf, read through Moonraker's file API.
@@ -158,3 +156,33 @@ const Api = {
   alignCancel() { return this.call('/api/align/cancel', {}); },
   alignRevert() { return this.call('/api/align/revert', {}); },
 };
+
+// The camera view and detection need MJPEG + single JPEG frames. WebRTC
+// services list a player page instead, so map them to their MJPEG endpoints:
+//   go2rtc (often port 1984):  .../stream.html?src=X  -> .../api/stream.mjpeg?src=X
+//                              snapshot                -> .../api/frame.jpeg?src=X
+//   camera-streamer WebRTC:    .../webrtc              -> .../stream, .../snapshot
+//   ustreamer / mjpg-streamer: ...?action=stream       -> ...?action=snapshot
+// Returns {stream, snapshot, kind}; snapshot is null if it can't be derived.
+function mjpegUrls(stream, snapshot) {
+  let u;
+  try { u = new URL(stream); } catch (e) { return { stream, snapshot, kind: 'unknown' }; }
+  const src = u.searchParams.get('src');
+  const base = u.origin + u.pathname.replace(/[^/]*$/, '');   // directory of the page
+  if (src && (/\.html$/.test(u.pathname) || /\/api\/(stream\.mjpeg|ws|webrtc)$/.test(u.pathname) || u.port === '1984')) {
+    const root = base.replace(/api\/$/, '');
+    const q = '?src=' + encodeURIComponent(src);
+    return { stream: root + 'api/stream.mjpeg' + q, snapshot: root + 'api/frame.jpeg' + q, kind: 'go2rtc' };
+  }
+  if (/\/webrtc\/?$/.test(u.pathname)) {
+    const root = u.origin + u.pathname.replace(/webrtc\/?$/, '');
+    return { stream: root + 'stream', snapshot: snapshot || root + 'snapshot', kind: 'camera-streamer' };
+  }
+  if (/action=stream/.test(stream)) {
+    return { stream, snapshot: snapshot || stream.replace('action=stream', 'action=snapshot'), kind: 'mjpeg' };
+  }
+  if (/\/stream(\.mjpeg)?$/.test(u.pathname)) {
+    return { stream, snapshot: snapshot || stream.replace(/\/stream(\.mjpeg)?(\?|$)/, '/snapshot$2'), kind: 'mjpeg' };
+  }
+  return { stream, snapshot, kind: 'unknown' };
+}

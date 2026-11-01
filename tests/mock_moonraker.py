@@ -129,7 +129,11 @@ def webcams():
         "name": "nozzle_cam", "service": "mjpegstreamer-adaptive",
         "stream_url": "http://localhost:%d/?action=stream" % CAM_PORT,
         "snapshot_url": "http://localhost:%d/?action=snapshot" % CAM_PORT,
-        "flip_horizontal": False, "flip_vertical": False}]})
+        "flip_horizontal": False, "flip_vertical": False}, {
+        # A go2rtc WebRTC camera, listed with its player page like Mainsail does.
+        "name": "chamber_go2rtc", "service": "webrtc-go2rtc",
+        "stream_url": "http://localhost:%d/stream.html?src=chamber" % (CAM_PORT + 1),
+        "snapshot_url": "", "flip_horizontal": False, "flip_vertical": False}]})
 
 
 CROWSNEST_CONF = ("""[crowsnest]
@@ -207,8 +211,10 @@ def streamer(make_frame):
 
     @cam.route("/")
     @cam.route("/webcam/")
+    @cam.route("/api/frame.jpeg")         # go2rtc snapshot
+    @cam.route("/api/stream.mjpeg")       # go2rtc MJPEG
     def index():
-        if request.args.get("action") == "snapshot":
+        if request.args.get("action") == "snapshot" or request.path.endswith("frame.jpeg"):
             return Response(make_frame(), mimetype="image/jpeg")
 
         def stream():

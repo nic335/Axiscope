@@ -172,6 +172,11 @@ cors_domains:
 - **Moonraker**: the webcams configured in Mainsail, Fluidd or `moonraker.conf`.
 - **crowsnest**: every `[cam ...]` section in `crowsnest.conf`, read through Moonraker. Axiscope first tries the standard nginx path for the camera's port (8080 → `/webcam/`, 8081 → `/webcam2/`, up to 8083), then the streamer port directly (with `no_proxy: true`). Cameras already in Moonraker's list aren't repeated; unreachable ones are dimmed.
 
+WebRTC cameras are shown through their MJPEG endpoints, because the camera view and detection need individual frames:
+
+- **go2rtc** (Mainsail's *WebRTC (go2rtc)* service, usually port 1984): `…/stream.html?src=cam` becomes `…/api/stream.mjpeg?src=cam`, with snapshots from `…/api/frame.jpeg?src=cam`. go2rtc needs ffmpeg for these if the source isn't already MJPEG.
+- **camera-streamer** in WebRTC mode: `…/webrtc` becomes `…/stream` and `…/snapshot`.
+
 Press **Rescan** after adding or plugging in a camera; the list also refreshes every 15 seconds while Setup is open.
 
 To use a stream from anywhere else, enter it under **Setup → Add a camera by stream URL**. Both full URLs (`http://192.168.1.50:8081/?action=stream`) and paths on the printer (`/webcam3/?action=stream`) work. The stream must be MJPEG with a matching snapshot URL (`?action=snapshot` or `/snapshot`), because detection works on single frames. Added cameras are remembered per printer and can be removed again.

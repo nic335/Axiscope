@@ -288,13 +288,6 @@ const normUrl = u => u.toLowerCase().replace(/\/\?/, '?').replace(/[?&]_probe=\d
 const manualCams = () => LS.get('manualCams:' + S.host, []);
 const saveManualCams = cams => LS.set('manualCams:' + S.host, cams);
 
-// Snapshot URL for a stream URL (ustreamer / mjpg-streamer / camera-streamer).
-function snapshotFor(stream) {
-  if (/action=stream/.test(stream)) return stream.replace('action=stream', 'action=snapshot');
-  if (/\/stream(\?|$)/.test(stream)) return stream.replace(/\/stream(\?|$)/, '/snapshot$1');
-  return null;
-}
-
 async function discoverCameras() {
   const [listed, crow] = await Promise.all([Printer.webcams().catch(() => []), Printer.crowsnestCams()]);
   const cams = listed.map(c => Object.assign({
@@ -373,9 +366,11 @@ async function addManualCamera(e) {
   try { new URL(stream); } catch (err) {
     status.textContent = 'That is not a valid URL.'; status.dataset.kind = 'error'; return;
   }
-  const snapshot = snapshotFor(stream);
+  // Player pages (go2rtc stream.html, camera-streamer /webrtc) become their MJPEG endpoints.
+  let snapshot;
+  ({ stream, snapshot } = mjpegUrls(stream, null));
   if (!snapshot) {
-    status.textContent = 'Use an MJPEG stream URL ending in ?action=stream or /stream, so Axiscope can grab single frames for detection.';
+    status.textContent = 'Axiscope needs an MJPEG stream it can grab single frames from: a URL ending in ?action=stream or /stream, or a go2rtc link with ?src=.';
     status.dataset.kind = 'error';
     return;
   }
