@@ -167,9 +167,21 @@ cors_domains:
 
 ### Cameras and minicam
 
-Axiscope lists the cameras from Moonraker (the ones Mainsail or Fluidd show) and also the `[cam ...]` sections in `crowsnest.conf`, so cameras that were never added to the web UI still appear. You can also add any MJPEG stream under **Setup → Add a camera by stream URL**.
+**Setup** lists cameras from two sources, so cameras that were never added to Mainsail or Fluidd still appear:
 
-**Minicam** in the top bar opens a second camera, such as a chamber cam, in a small window. Drag it to any corner, resize it from its inner corner, and pick its camera from the dropdown.
+- **Moonraker**: the webcams configured in Mainsail, Fluidd or `moonraker.conf`.
+- **crowsnest**: every `[cam ...]` section in `crowsnest.conf`, read through Moonraker. Axiscope first tries the standard nginx path for the camera's port (8080 → `/webcam/`, 8081 → `/webcam2/`, up to 8083), then the streamer port directly (with `no_proxy: true`). Cameras already in Moonraker's list aren't repeated; unreachable ones are dimmed.
+
+Press **Rescan** after adding or plugging in a camera; the list also refreshes every 15 seconds while Setup is open.
+
+To use a stream from anywhere else, enter it under **Setup → Add a camera by stream URL**. Both full URLs (`http://192.168.1.50:8081/?action=stream`) and paths on the printer (`/webcam3/?action=stream`) work. The stream must be MJPEG with a matching snapshot URL (`?action=snapshot` or `/snapshot`), because detection works on single frames. Added cameras are remembered per printer and can be removed again.
+
+**Minicam** in the top bar opens a second camera, such as a chamber cam, in a floating window over the page:
+
+- Pick its camera from the dropdown in its header.
+- Drag it by the header strip or the video; it snaps to the nearest corner.
+- Resize it from the grip on its inner corner, or focus the grip and use the arrow keys (Shift for bigger steps).
+- Its camera, corner and size are remembered in the browser. Closing it also stops its stream.
 
 The animations below show the previous interface, but the steps are the same.
 
@@ -202,10 +214,21 @@ Otherwise, run `~/axiscope/axiscope-env/bin/pip install numpy opencv-python-head
 
 ### Development without a printer
 
-`python tests/mock_moonraker.py` starts a simulated toolchanger and nozzle camera on port 7125. Run `python app.py` and connect to `localhost:7125`. A correct calibration recovers the mock's true offsets. Run the tests with `python -m pytest tests`.
+Install the dependencies once (`pip install -r requirements.txt pytest`), then:
+
+```bash
+python tests/mock_moonraker.py   # simulated toolchanger: Moonraker on 7125, cameras on 18080/18081
+python app.py                    # Axiscope on http://localhost:3000
+```
+
+Opening `http://localhost:3000` connects to the mock by itself. The mock offers three cameras: one listed by Moonraker, one only in its `crowsnest.conf`, and one offline. Its tools have known "true" offsets, and a correct calibration recovers them exactly. Set `CAM_PORT` to move the camera ports if 18080/18081 are taken.
+
+Run the tests with `python -m pytest tests`.
 
 ## Troubleshooting And FAQ
 ### Camera is not shown in Axiscope
+Press **Rescan** under **Setup**. Axiscope reads both Moonraker's webcam list and `crowsnest.conf`. If a crowsnest camera shows as *not reachable*, its port has no nginx path and the streamer only listens locally: set `no_proxy: true` for that camera in `crowsnest.conf`, or add its stream with **Add a camera by stream URL**.
+
 The camera needs to be configured and also configured in mainsail
 This following links will guide you thru installing and configuring the camera in crowsness and fluid and mainsail
 
