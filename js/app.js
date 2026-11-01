@@ -244,7 +244,7 @@ async function connect(host, { auto = false } = {}) {
     $('connect-btn').hidden = true;
     $('disconnect-btn').hidden = false;
     startPolling();
-    await refreshCameras();
+    await refreshCameras(true);
     // Keep the saved camera if it still exists; with a single camera there is nothing to choose.
     const saved = S.camera && (S.cameras.find(c => c.stream === S.camera.stream) || S.cameras.find(c => c.name === S.camera.name));
     if (saved) selectCamera(saved, { keepView: true, stay: !auto });
@@ -283,12 +283,30 @@ function disconnect() {
 // Fluidd show) and crowsnest.conf, which can hold cameras never added to the
 // web UI. Crowsnest entries already covered by the webcam list are skipped.
 const normUrl = u => u.toLowerCase().replace(/\/\?/, '?').replace(/[?&]_probe=\d+/, '');
+// Origin + directory: /webcam/?action=stream and /webcam/stream are one camera.
+const dirOf = u => {
+  try { const p = new URL(u); return (p.origin + p.pathname.replace(/[^/]*$/, '')).toLowerCase(); }
+  catch (e) { return normUrl(u); }
+};
+
+// Probe results are remembered so the periodic refresh doesn't keep hitting
+// (and logging errors for) cameras that are down. Failures are retried after
+// a few minutes, or right away on Rescan.
+const probeCache = new Map();   // snapshot URL -> {ok, t}
+const PROBE_RETRY_MS = 5 * 60 * 1000;
+async function probeCached(url, force) {
+  const hit = probeCache.get(url);
+  if (!force && hit && (hit.ok || Date.now() - hit.t < PROBE_RETRY_MS)) return hit.ok;
+  const ok = await Printer.probeImage(url);
+  probeCache.set(url, { ok, t: Date.now() });
+  return ok;
+}
 
 // Cameras added by URL in Setup, remembered per printer.
 const manualCams = () => LS.get('manualCams:' + S.host, []);
 const saveManualCams = cams => LS.set('manualCams:' + S.host, cams);
 
-async function discoverCameras() {
+async function discoverCameras(force) {
   const [listed, crow] = await Promise.all([Printer.webcams().catch(() => []), Printer.crowsnestCams()]);
   const cams = listed.map(c => Object.assign({
     name: c.name, source: 'Moonraker', service: c.service || 'webcam',
@@ -297,11 +315,13 @@ async function discoverCameras() {
   // Probe in parallel but keep crowsnest.conf order.
   const crowCams = await Promise.all(crow.map(async c => {
     const options = Printer.crowsnestUrls(c);
-    const known = cams.some(k => options.some(o => normUrl(o.stream) === normUrl(k.stream)));
+    // Already listed by Moonraker (same name, or served from the same path)?
+    const known = cams.some(k => k.name.toLowerCase() === c.name.toLowerCase()
+      || options.some(o => dirOf(o.stream) === dirOf(k.stream)));
     if (known) return null;
     let found = null;
     for (const o of options) {
-      if (await Printer.probeImage(o.snapshot)) { found = o; break; }
+      if (await probeCached(o.snapshot, force)) { found = o; break; }
     }
     const pick = found || options[0];
     return {
@@ -312,17 +332,17 @@ async function discoverCameras() {
   crowCams.forEach(c => { if (c) cams.push(c); });
   const manual = await Promise.all(manualCams().map(async c => Object.assign({
     source: 'manual', service: 'stream URL', flipH: false, flipV: false, manual: true,
-    reachable: await Printer.probeImage(c.snapshot),
+    reachable: await probeCached(c.snapshot, force),
   }, c)));
   return cams.concat(manual);
 }
 
 let cameraKey = '';
-async function refreshCameras() {
+async function refreshCameras(force = false) {
   if (!S.host) return;
   const btn = $('rescan-cameras');
   if (btn) btn.disabled = true;
-  const cams = await discoverCameras();
+  const cams = await discoverCameras(force === true);
   if (!S.host) return;  // disconnected meanwhile
   const key = JSON.stringify(cams.map(c => [c.name, c.stream, c.reachable]));
   S.cameras = cams;
@@ -350,7 +370,7 @@ function renderCameraList() {
     refreshCameras();
   }));
   list.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => selectCamera(S.cameras[Number(b.dataset.cam)])));
-  $('rescan-cameras').addEventListener('click', refreshCameras);
+  $('rescan-cameras').addEventListener('click', () => refreshCameras(true));
   if (window.Minicam && Minicam.el) Minicam.refresh();
 }
 

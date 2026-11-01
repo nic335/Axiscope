@@ -111,14 +111,17 @@ const Printer = {
   // standard Mainsail/Fluidd setup maps to its port (8080 -> /webcam/,
   // 8081 -> /webcam2/, ...), then the streamer's port directly (no_proxy).
   crowsnestUrls(cam) {
-    const out = [];
+    const bases = [];
     const idx = cam.port - 8080;
-    if (idx >= 0 && idx < 4) {
-      const base = 'http://' + this.webHost() + '/webcam' + (idx ? idx + 1 : '') + '/';
-      out.push({ stream: base + '?action=stream', snapshot: base + '?action=snapshot', via: 'proxy' });
-    }
-    const direct = 'http://' + this.hostname() + ':' + cam.port + '/';
-    out.push({ stream: direct + '?action=stream', snapshot: direct + '?action=snapshot', via: 'port ' + cam.port });
+    if (idx >= 0 && idx < 4) bases.push(['http://' + this.webHost() + '/webcam' + (idx ? idx + 1 : '') + '/', 'proxy']);
+    bases.push(['http://' + this.hostname() + ':' + cam.port + '/', 'port ' + cam.port]);
+    // ustreamer speaks ?action=...; camera-streamer has /stream and /snapshot.
+    const native = /camera-streamer/i.test(cam.mode || '');
+    const forms = native
+      ? [['stream', 'snapshot'], ['?action=stream', '?action=snapshot']]
+      : [['?action=stream', '?action=snapshot']];
+    const out = [];
+    bases.forEach(([base, via]) => forms.forEach(([st, sn]) => out.push({ stream: base + st, snapshot: base + sn, via })));
     return out;
   },
 
