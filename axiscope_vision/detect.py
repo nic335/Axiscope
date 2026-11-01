@@ -37,6 +37,7 @@ DEFAULTS = {
     "min_ring_gap": 3.0,      # px between distinct rings
     "max_rings": 5,
     "require_concentric": True,
+    "process_width": 960,     # detect on a copy scaled to this width (0 = full size)
 }
 
 _NUMERIC = {
@@ -50,6 +51,7 @@ _NUMERIC = {
     "min_prominence": (float, 0.0, 1.0),
     "min_ring_gap": (float, 1.0, 100.0),
     "max_rings": (int, 1, 12),
+    "process_width": (int, 0, 8000),
 }
 _BOOL = ("clahe", "require_concentric")
 
@@ -294,6 +296,35 @@ def detect(img, params=None, hint=None, want_edges=False):
     """
     t0 = time.perf_counter()
     p = merge_params(params)
+    H, W = img.shape[:2]
+    # Large frames (1080p+) are slow to search; work on a scaled copy and map
+    # the result back. The ring fit is sub-pixel, so accuracy stays well
+    # under a source pixel at 2x reduction.
+    scale = 1.0
+    if p["process_width"] and W > p["process_width"]:
+        scale = p["process_width"] / float(W)
+        img = cv2.resize(img, (int(round(W * scale)), int(round(H * scale))), interpolation=cv2.INTER_AREA)
+        if hint is not None:
+            hint = ((hint[0] + 0.5) * scale - 0.5, (hint[1] + 0.5) * scale - 0.5)
+    q = dict(p)
+    q["min_radius"] = max(2, int(round(p["min_radius"] * scale)))
+    q["max_radius"] = max(q["min_radius"] + 1, int(round(p["max_radius"] * scale)))
+    q["min_ring_gap"] = max(1.5, p["min_ring_gap"] * scale)
+    out = _detect_scaled(img, q, hint, want_edges)
+    for r in ([out["best"]] if out["best"] else []) + out["candidates"]:
+        # INTER_AREA maps source pixel centre x to (x + 0.5) * scale - 0.5.
+        r["x"] = (r["x"] + 0.5) / scale - 0.5
+        r["y"] = (r["y"] + 0.5) / scale - 0.5
+        for ring in r["rings"]:
+            ring["r"] = round(ring["r"] / scale, 2)
+        if r["fit_rms"] is not None:
+            r["fit_rms"] = round(r["fit_rms"] / scale, 3)
+    out.update(width=int(W), height=int(H), params=p, scale=round(scale, 4),
+               ms=round((time.perf_counter() - t0) * 1000.0, 1))
+    return out
+
+
+def _detect_scaled(img, p, hint, want_edges):
     h, w = img.shape[:2]
     gray = preprocess(img, p)
     edges = cv2.Canny(gray, p["canny_low"], p["canny_high"], L2gradient=True)
@@ -342,8 +373,6 @@ def detect(img, params=None, hint=None, want_edges=False):
         "candidates": [r for r in results if r is not best][:6],
         "edge_pixels": int(len(index.x)),
         "warning": warning,
-        "ms": round((time.perf_counter() - t0) * 1000.0, 1),
-        "params": p,
     }
     if want_edges:
         ok, jpg = cv2.imencode(".jpg", edges, [cv2.IMWRITE_JPEG_QUALITY, 70])

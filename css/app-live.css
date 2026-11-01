@@ -42,6 +42,13 @@ body { background: var(--canvas, #101211); }
 .contrast-control { display: flex; align-items: center; gap: 8px; font-size: 11px; }
 .contrast-control input { width: 90px; accent-color: var(--accent); }
 
+/* auto-align progress shown on the camera image */
+.align-badge { position: absolute; left: 50%; top: 17px; transform: translateX(-50%); max-width: calc(100% - 260px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; z-index: 2;
+  font: 10px monospace; letter-spacing: .4px; color: var(--accent); background: #121810e6; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+.align-badge[data-state="running"]::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: 1px; animation: ax-pulse .8s infinite alternate; }
+.align-badge[data-state="failed"], .align-badge[data-state="not_converged"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+@media (max-width: 760px) { .align-badge { top: auto; bottom: 56px; max-width: calc(100% - 24px); } }
+
 /* ---- detection ---- */
 .detection-advanced-body { display: block !important; }
 .detection-advanced-body .detection-ranges { grid-template-columns: repeat(4, minmax(0, 1fr)); }

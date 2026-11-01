@@ -47,7 +47,8 @@ _LIMITS = {
 
 MIN_PX_PER_MM = 10.0       # less than this and the camera is not seeing motion
 MAX_SKEW_DEG = 30.0        # probe axes must be roughly perpendicular in the image
-MAX_SAMPLE_SPREAD = 3.0    # px; frames of one measurement must agree
+MAX_SAMPLE_SPREAD = 3.0    # px floor; frames of one measurement must agree
+SAMPLE_SPREAD_FRACTION = 0.03  # ...or within 3% of the main ring radius
 
 # Last good mapping per camera URL, reused when reuse_calibration is set.
 _calibration_cache = {}
@@ -181,7 +182,8 @@ class AutoAligner:
         pts = np.array(pts)
         med = np.median(pts, axis=0)
         spread = float(np.max(np.hypot(*(pts - med).T))) if len(pts) > 1 else 0.0
-        if spread > MAX_SAMPLE_SPREAD:
+        r_main = max(r["r"] for r in last["best"]["rings"]) if last and last["best"] else 0.0
+        if spread > max(MAX_SAMPLE_SPREAD, SAMPLE_SPREAD_FRACTION * r_main):
             raise AlignError(
                 "Frames disagree by %.1f px; the camera image is not stable "
                 "(vibration, stale frames or a second circle in view)." % spread)

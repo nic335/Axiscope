@@ -151,13 +151,15 @@ const Vision = {
     $('jog-align-circle').addEventListener('click', () => this.startAlign());
     $('align-cancel').addEventListener('click', () => Api.alignCancel().catch(e => notice(e.message, 'error')));
     $('align-retry').addEventListener('click', () => this.startAlign());
-    $('align-dismiss').addEventListener('click', () => { $('align-panel').hidden = true; this.job = null; this.schedule(true); });
+    $('align-badge').addEventListener('click', () => $('align-panel').scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    $('align-dismiss').addEventListener('click', () => { $('align-badge').hidden = true; $('align-panel').hidden = true; this.job = null; this.schedule(true); });
     $('align-revert').addEventListener('click', async () => {
       $('align-revert').disabled = true;
       try {
         const r = await Api.alignRevert();
         notice(`Moved back to X ${r.position[0].toFixed(3)} Y ${r.position[1].toFixed(3)}.`);
         $('align-panel').hidden = true;
+        $('align-badge').hidden = true;
         this.job = null;
       } catch (e) {
         notice('Revert failed: ' + e.message, 'error');
@@ -176,6 +178,7 @@ const Vision = {
       await poll();  // make sure the captured position is the post-alignment one
       capture();
       $('align-panel').hidden = true;
+      $('align-badge').hidden = true;
       this.job = null;
       this.schedule(true);
     });
@@ -299,6 +302,8 @@ const Vision = {
         tool,
       });
       this.showJob(job);
+      // The panel sits below the camera; bring it into view.
+      $('align-panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       this.pollJob();
     } catch (e) {
       S.busy = false;
@@ -316,6 +321,8 @@ const Vision = {
       this.showJob(job);
       if (TERMINAL.includes(job.state) || job.state === 'idle') {
         S.busy = false;
+        if (job.state === 'failed') notice('Auto alignment stopped: ' + job.message, 'error');
+        $('align-panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         poll();
         renderBusy();
         this.schedule(true);
@@ -332,6 +339,13 @@ const Vision = {
     $('align-state').textContent = labels[job.state] || job.state.toUpperCase();
     $('align-panel').dataset.state = job.state;
     $('align-cancel').hidden = job.state !== 'running';
+    // Mirror progress on the camera image, where the user is looking.
+    const badge = $('align-badge');
+    badge.hidden = false;
+    badge.dataset.state = job.state;
+    setText(badge, job.state === 'running'
+      ? 'AUTO ALIGN · ' + (job.message || 'starting…')
+      : 'AUTO ALIGN · ' + (labels[job.state] || job.state.toUpperCase()) + ' · details below');
     $('align-steps').innerHTML = (job.steps || []).map(s => `<li data-phase="${esc(s.phase)}"><span>${esc(s.phase.replace('_', ' '))}</span>${esc(s.message)}</li>`).join('');
     $('align-steps').scrollTop = $('align-steps').scrollHeight;
     if (job.detection && job.frame) {
