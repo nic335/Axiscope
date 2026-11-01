@@ -461,3 +461,15 @@ def test_autoalign_within_roi_ignores_decoy_without_lock():
     st = a.snapshot()
     assert st["state"] == "converged", st["message"]
     assert np.hypot(*(rig.nozzle_px() - [rig.w / 2, rig.h / 2])) < 3
+
+
+def test_orient_view_matches_css_order():
+    from axiscope_vision.detect import orient_view
+    img = np.zeros((2, 3), np.uint8)
+    img[0, 0] = 255                      # top-left marker
+    # 90 deg clockwise: top-left goes to top-right, image becomes 3x2.
+    r = orient_view(img, {"rotate": 90})
+    assert r.shape == (3, 2) and r[0, 1] == 255
+    # Flip H first (marker to top-right), then 90 cw: marker ends bottom-right.
+    r = orient_view(img, {"rotate": 90, "flipH": True})
+    assert r[2, 1] == 255

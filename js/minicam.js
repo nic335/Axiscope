@@ -107,7 +107,8 @@ const Minicam = {
         try {
           const res = await fetch('/api/vision/frame', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
-            body: JSON.stringify({ camera_url: S.camera.snapshot, stage: this._visionStage, params: Vision.params(), lock: Vision.lock, roi: Vision.roi() }),
+            body: JSON.stringify({ camera_url: S.camera.snapshot, stage: this._visionStage, params: Vision.params(), lock: Vision.lock, roi: Vision.roi(),
+              view: { rotate: S.view.rotate || 0, flipH: !!S.view.flipH, flipV: !!S.view.flipV } }),
           });
           if (res.status === 404 || res.status === 405) throw new Error('the Axiscope service is older than this page. ' + RESTART_HINT);
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);

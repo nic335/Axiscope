@@ -533,3 +533,19 @@ def _scale_lock(lock, s):
             out[k] = float(out[k]) * s
     out["rings"] = [float(r) * s for r in (out.get("rings") or [])]
     return out
+
+
+def orient_view(img, view):
+    """Apply the camera view's flips and clockwise rotation (as the page's CSS
+    does: flip first, then rotate) so pipeline views match the main view."""
+    if not view:
+        return img
+    if view.get("flipH") and view.get("flipV"):
+        img = cv2.flip(img, -1)
+    elif view.get("flipH"):
+        img = cv2.flip(img, 1)
+    elif view.get("flipV"):
+        img = cv2.flip(img, 0)
+    rot = int(view.get("rotate") or 0) % 360
+    codes = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+    return cv2.rotate(img, codes[rot]) if rot in codes else img

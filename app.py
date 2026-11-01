@@ -12,7 +12,7 @@ from flask.wrappers import Response
 try:
     import cv2
     from axiscope_vision.align import AlignError, AutoAligner, MappingStore, describe_mapping
-    from axiscope_vision.detect import PIPELINE_STAGES, crop_roi, detect, pipeline_view
+    from axiscope_vision.detect import PIPELINE_STAGES, crop_roi, detect, orient_view, pipeline_view
     from axiscope_vision.hardware import HardwareError, MoonrakerPrinter, SnapshotCamera
     from axiscope_vision.tune import TuneError, autotune
     VISION_ERROR = None
@@ -114,6 +114,7 @@ def api_vision_frame():
         return _error(str(e), 502)
     lock = body.get('lock') if isinstance(body.get('lock'), dict) else None
     view = pipeline_view(img, body.get('params'), stage, lock=lock, roi=body.get('roi'))
+    view = orient_view(view, body.get('view') if isinstance(body.get('view'), dict) else None)
     ok, jpg = cv2.imencode('.jpg', view, [cv2.IMWRITE_JPEG_QUALITY, 80])
     if not ok:
         return _error('Could not encode the image', 500)

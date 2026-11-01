@@ -106,6 +106,13 @@ const CameraView = {
     if (edgesDataUrl) {
       this.edgeImg.src = edgesDataUrl;
       this.edgeImg.hidden = false;
+      // The edge map covers only the searched area (zoomed-in region) when
+      // there is one: place it there instead of stretching it over the frame.
+      const W = det.width, H = det.height, r = det.roi || [0, 0, W, H];
+      Object.assign(this.edgeImg.style, {
+        left: (100 * r[0] / W) + '%', top: (100 * r[1] / H) + '%',
+        width: (100 * (r[2] - r[0]) / W) + '%', height: (100 * (r[3] - r[1]) / H) + '%',
+      });
     } else {
       this.edgeImg.hidden = true;
     }
