@@ -322,3 +322,52 @@ def test_probe_out_of_view_with_decoy_retries_instead_of_taking_decoy():
     assert st["state"] == "converged", st["message"]
     assert any("other side" in s["message"] for s in st["steps"])
     assert np.hypot(*(rig.nozzle_px() - [rig.w / 2, rig.h / 2])) < 3
+
+
+# --- saved camera mapping ---
+from axiscope_vision.align import MappingStore  # noqa: E402
+
+
+def test_mapping_store_persists_to_disk(tmp_path):
+    path = str(tmp_path / "sub" / "mappings.json")
+    MappingStore(path).set("cam", [[380.0, 0.0], [0.0, -380.0]], (1280, 720))
+    entry = MappingStore(path).get("cam")
+    assert entry["matrix"] == [[380.0, 0.0], [0.0, -380.0]] and entry["frame"] == [1280, 720]
+    assert MappingStore(path).delete("cam") and MappingStore(path).get("cam") is None
+
+
+def test_saved_mapping_skips_probes_and_is_refreshed_when_stale():
+    store = MappingStore()
+    rig = SimRig(angle_deg=90, mirror=True)
+    AutoAligner(rig, rig, PARAMS, FAST, camera_key="cam", store=store).run()
+    saved = np.array(store.get("cam")["matrix"])
+    # Second tool: the saved mapping is used, no probe moves.
+    rig2 = SimRig(angle_deg=90, mirror=True, start=(150.3, 149.8))
+    a = AutoAligner(rig2, rig2, PARAMS, dict(FAST, tolerance=0.005), camera_key="cam", store=store)
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    assert any("Using saved camera mapping" in s["message"] for s in st["steps"])
+    assert not any(s["phase"].startswith("probe") for s in st["steps"])
+    # Camera turned 90 degrees since: the check step notices and re-maps.
+    rig3 = SimRig(angle_deg=0, mirror=True, start=(150.3, 149.8))
+    a = AutoAligner(rig3, rig3, PARAMS, dict(FAST, tolerance=0.005), camera_key="cam", store=store)
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    assert any("no longer matches" in s["message"] for s in st["steps"])
+    assert not np.allclose(np.array(store.get("cam")["matrix"]), saved, atol=20)
+    # The check step was capped to the probe distance.
+    assert np.hypot(*rig3.moves[0]) <= 0.5 + 1e-9
+
+
+def test_saved_mapping_ignored_at_other_resolution():
+    store = MappingStore()
+    store.set("cam", [[380.0, 0.0], [0.0, -380.0]], (1920, 1080))
+    rig = SimRig(mirror=True, start=(150.3, 149.8))     # 1280x720
+    a = AutoAligner(rig, rig, PARAMS, FAST, camera_key="cam", store=store)
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged"
+    assert any(s["phase"] == "probe_x" for s in st["steps"])
+    assert store.get("cam")["frame"] == [1280, 720]

@@ -63,6 +63,10 @@ body { background: var(--canvas, #101211); }
 .detection-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .detection-buttons .secondary { white-space: nowrap; }
 
+/* saved camera mapping */
+.mapping-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font: 11px monospace; color: #b4bdaf; margin: 10px 0 0 !important; }
+.mapping-status .text-button { font-size: 10px; }
+
 /* slider help + overlay legend */
 .dial-help { display: block; font-size: 10px; line-height: 1.45; color: #8f9a88; margin-top: 2px; }
 .overlay-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); font-size: 10px; color: #a3ac9f; }

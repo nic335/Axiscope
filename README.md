@@ -208,11 +208,15 @@ Axiscope can find and centre the nozzle for you. Detection and motion run on the
 
 **Picking the right circle.** Live detection locks onto the nozzle and follows it, instead of jumping to whichever circle looks strongest in each frame. If it picks something else (a screw head, a reflection), click the nozzle in the camera image to lock onto it; **Release lock** undoes that. Auto align starts from the locked target and, after every move, only looks where the nozzle should now be.
 
-**Camera mounted sideways or mirrored?** Press **Check orientation**. Axiscope moves 0.5 mm in X and in Y, watches where the nozzle goes in the image, moves back and checks it returns to the same pixel. It reports the result in plain terms ("+X moves the image down, +Y moves it right") and turns the camera view so +X points right and +Y up on screen, which makes the jog arrows match the picture. This only changes the display; detection and alignment always use the raw frame, so they work with any camera orientation. **Rotate** and **Flip H/V** under the camera adjust the view by hand.
+**Camera mapping.** Axiscope needs to know how machine moves look in the camera image (scale, rotation, mirroring). Press **Map camera** once: it moves 0.5 mm in X and in Y, watches where the nozzle goes, moves back, and checks it returns to the same pixel. The result is reported in plain terms ("+X moves the image down, +Y moves it right") and **saved per camera** on the Axiscope host (`~/.config/axiscope/mappings.json`, or `$AXISCOPE_DATA`), so later runs skip the probe moves. If you skip this step, the first Auto align measures and saves the mapping itself.
+
+With a saved mapping, Auto align makes a short first move (at most the probe distance) and compares where the image went with what the mapping predicts. If the camera was bumped, turned or changed resolution, it measures the mapping again automatically. **Redo mapping** forces a fresh measurement, **Forget** deletes it, and *Setup → Use the saved camera mapping* turns the reuse off.
+
+Mapping also turns the camera *view* so +X points right and +Y up on screen, which makes the jog arrows match the picture; the view orientation is remembered per camera. This only changes the display: detection and alignment always use the raw frame. **Rotate** and **Flip H/V** under the camera adjust the view by hand.
 
 If a run behaves oddly, press **Copy log** in the result panel and include it in a bug report; it lists every measurement, the learned mapping and the settings.
 
-Iterations, tolerance, probe distance, safety limit, settle time and speed are under **Setup → Auto alignment**. Turn on *Reuse camera calibration* to skip the probe moves for the 2nd and later tools.
+Iterations, tolerance, probe distance, safety limit, settle time and speed are under **Setup → Auto alignment**. The learned camera mapping is saved, so only the first run (or **Map camera**) makes the probe moves.
 
 Existing installs: the update manager installs OpenCV automatically if your `[update_manager axiscope]` section has these lines (new installs get them):
 

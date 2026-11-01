@@ -14,7 +14,9 @@ wrong first estimate still converges.
 The aligner never captures or saves anything: it ends in a terminal state
 and the UI asks the user to accept, retry or revert.
 """
+import json
 import math
+import os
 import threading
 import time
 
@@ -32,7 +34,7 @@ ALIGN_DEFAULTS = {
     "samples": 3,             # frames per measurement (median)
     "feed": 10.0,             # mm/s
     "approach": 0.0,          # mm backlash approach (0 disables)
-    "reuse_calibration": False,
+    "reuse_calibration": True,  # use the saved camera mapping instead of probing
 }
 
 _LIMITS = {
@@ -52,8 +54,54 @@ MAX_SKEW_DEG = 30.0        # probe axes must be roughly perpendicular in the ima
 MAX_SAMPLE_SPREAD = 3.0    # px floor; frames of one measurement must agree
 SAMPLE_SPREAD_FRACTION = 0.03  # ...or within 3% of the main ring radius
 
-# Last good mapping per camera URL, reused when reuse_calibration is set.
-_calibration_cache = {}
+MAPPING_CHECK_TOLERANCE = 0.35  # saved mapping: max |observed - expected| / |expected|
+
+
+class MappingStore:
+    """Learned camera mappings (px-per-mm matrix) per camera, kept in a JSON
+    file so they survive restarts. path=None keeps them in memory only."""
+
+    def __init__(self, path=None):
+        self.path = path
+        self._lock = threading.Lock()
+        self._data = {}
+        if path and os.path.exists(path):
+            try:
+                with open(path) as f:
+                    self._data = json.load(f)
+            except (OSError, ValueError):
+                self._data = {}
+
+    def get(self, key):
+        with self._lock:
+            entry = self._data.get(key)
+            return dict(entry) if entry else None
+
+    def set(self, key, J, frame):
+        entry = {"matrix": [[float(v) for v in row] for row in J],
+                 "frame": [int(frame[0]), int(frame[1])], "saved_at": time.time()}
+        with self._lock:
+            self._data[key] = entry
+            self._save()
+        return entry
+
+    def delete(self, key):
+        with self._lock:
+            existed = self._data.pop(key, None) is not None
+            self._save()
+            return existed
+
+    def _save(self):
+        if not self.path:
+            return
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(self._data, f, indent=1)
+        os.replace(tmp, self.path)   # atomic: never leaves a half-written file
+
+
+_memory_store = MappingStore()   # default for callers that don't pass a store
 
 
 class AlignError(RuntimeError):
@@ -109,7 +157,7 @@ class AutoAligner:
     """Runs one alignment. Thread-safe status via snapshot()."""
 
     def __init__(self, printer, camera, detect_params=None, settings=None,
-                 target=None, camera_key=None, tool=None, mode="align", lock=None):
+                 target=None, camera_key=None, tool=None, mode="align", lock=None, store=None):
         self.printer = printer
         self.camera = camera
         self.detect_params = detect_params or {}
@@ -120,6 +168,8 @@ class AutoAligner:
         self.mode = "orient" if mode == "orient" else "align"
         # Target the user locked in the live view: the first scan stays on it.
         self.initial_lock = lock if isinstance(lock, dict) else None
+        self.store = store if store is not None else _memory_store
+        self._frame = None
         self._settle_note = ""
         self._lock = threading.Lock()
         self._cancel = threading.Event()
@@ -365,6 +415,7 @@ class AutoAligner:
                 msg += " " + res["warning"]
             raise AlignError(msg + " Adjust the radius range or edge thresholds.")
         ref = res["best"]
+        self._frame = (res["width"], res["height"])
         if self.target is None:
             self.target = np.array([res["width"] / 2.0, res["height"] / 2.0])
         rings = ", ".join("%.0f" % r["r"] for r in ref["rings"])
@@ -374,14 +425,15 @@ class AutoAligner:
         if self.mode == "orient":
             return self._orient(start, p, ref)
 
-        J = None
-        if s["reuse_calibration"] and self.camera_key in _calibration_cache:
-            J = _calibration_cache[self.camera_key].copy()
-            self._step("calibration", "Reusing camera calibration (%.1f px/mm)"
-                       % describe_mapping(J)["px_per_mm"])
+        J = self._saved_mapping() if s["reuse_calibration"] else None
+        check_saved = J is not None
+        if J is not None:
+            self._step("calibration", "Using saved camera mapping: " + mapping_text(J)
+                       + ". The first move checks it.", mapping=describe_mapping(J))
         else:
             J, p = self._calibrate(p, ref)
-        self._step("calibration", "Mapping: " + mapping_text(J), mapping=describe_mapping(J))
+            self._remember(J)
+            self._step("calibration", "Mapping: " + mapping_text(J), mapping=describe_mapping(J))
 
         converged = False
         corrections = 0
@@ -422,6 +474,10 @@ class AutoAligner:
                 raise AlignError("Correction of %.2f mm exceeds the %.2f mm safety limit. "
                                  "Jog the nozzle closer to the crosshair first."
                                  % (err_mm, s["max_move"]))
+            if check_saved and np.hypot(*move) > s["probe_distance"]:
+                # A saved mapping might be stale (camera bumped or turned):
+                # take a short step first and see if the image agrees.
+                move = move * (s["probe_distance"] / float(np.hypot(*move)))
             corrections += 1
             self._step("correct", "Correction %d/%d: X%+.4f Y%+.4f mm (error %.4f mm)"
                        % (corrections, s["max_iterations"], move[0], move[1], err_mm),
@@ -429,9 +485,15 @@ class AutoAligner:
             self._move(*move)
             expected = J @ move
             predicted = p + expected
-            p_new, _ = self._measure(hint=tuple(predicted), ref=ref, before=p,
-                                     lock=self._track_lock(ref, predicted, expected),
-                                     min_departure=0.5 * float(np.hypot(*expected)))
+            if check_saved:
+                # The prediction comes from the mapping under test, so look for
+                # the nozzle by its rings anywhere instead of where it "should" be.
+                p_new, _ = self._measure(ref=ref, before=p, lock=self._ring_lock(ref),
+                                         min_departure=3.0)
+            else:
+                p_new, _ = self._measure(hint=tuple(predicted), ref=ref, before=p,
+                                         lock=self._track_lock(ref, predicted, expected),
+                                         min_departure=0.5 * float(np.hypot(*expected)))
             if p_new is None:
                 raise AlignError("Lost the nozzle after correction %d." % corrections)
             observed = p_new - p
@@ -440,6 +502,20 @@ class AutoAligner:
                           np.hypot(*expected), _image_dir(expected), self._settle_note),
                        observed_px=[round(float(v), 2) for v in observed],
                        expected_px=[round(float(v), 2) for v in expected])
+            if check_saved:
+                check_saved = False
+                big = np.hypot(*expected) >= 8.0
+                off = np.hypot(*(observed - expected)) / max(1e-9, float(np.hypot(*expected)))
+                if big and off > MAPPING_CHECK_TOLERANCE:
+                    self._step("calibration", "Saved mapping no longer matches the camera "
+                               "(%.0f%% off); measuring it again." % (off * 100))
+                    J, p = self._calibrate(p_new, ref)
+                    self._remember(J)
+                    self._step("calibration", "Mapping: " + mapping_text(J),
+                               mapping=describe_mapping(J))
+                    corrections -= 1   # the check step doesn't count as a correction
+                    last_err, worse = None, 0
+                    continue
             # Broyden update from the observed motion, if the move was big enough
             # for the image delta to carry information beyond detection noise.
             if np.hypot(*move) * describe_mapping(J)["px_per_mm"] > 4.0:
@@ -452,8 +528,8 @@ class AutoAligner:
                     pass
             p = p_new
 
-        if self.camera_key is not None:
-            _calibration_cache[self.camera_key] = J.copy()
+        if converged:
+            self._remember(J)   # refined by the corrections
 
         final = self.printer.position()
         residual_px = self.target - p
@@ -496,8 +572,7 @@ class AutoAligner:
                       "" if consistent else ". That is more than expected: check for backlash, "
                       "a loose camera or image lag (raise Settle time)."),
                    return_px=round(ret_px, 2))
-        if self.camera_key is not None:
-            _calibration_cache[self.camera_key] = J.copy()
+        self._remember(J)
         return {
             "mode": "orient",
             "mapping": describe_mapping(J),
@@ -508,6 +583,24 @@ class AutoAligner:
             "final_position": self.printer.position(),
             "rings": ref["rings"],
         }
+
+    def _saved_mapping(self):
+        """Saved matrix for this camera, if it was measured at this resolution."""
+        if self.camera_key is None:
+            return None
+        entry = self.store.get(self.camera_key)
+        if not entry or list(entry.get("frame", [])) != [int(v) for v in self._frame]:
+            return None
+        J = np.array(entry["matrix"], dtype=float)
+        try:
+            self._validate(J)
+        except AlignError:
+            return None
+        return J
+
+    def _remember(self, J):
+        if self.camera_key is not None and self._frame:
+            self.store.set(self.camera_key, J, self._frame)
 
     def revert(self):
         """Move back to the position the alignment started from."""

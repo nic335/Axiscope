@@ -1,4 +1,5 @@
 import base64
+import os
 import threading
 
 from flask.app import Flask
@@ -8,7 +9,7 @@ from flask.json import jsonify
 
 try:
     import cv2
-    from axiscope_vision.align import AlignError, AutoAligner
+    from axiscope_vision.align import AlignError, AutoAligner, MappingStore, describe_mapping
     from axiscope_vision.detect import detect
     from axiscope_vision.hardware import HardwareError, MoonrakerPrinter, SnapshotCamera
     VISION_ERROR = None
@@ -17,6 +18,11 @@ except ImportError as e:  # the manual UI keeps working without OpenCV
     VISION_ERROR = str(e)
 
 app = Flask(__name__)
+
+# Learned camera mappings live outside the git checkout, so Moonraker's
+# update manager never sees a dirty repo.
+DATA_DIR = os.path.expanduser(os.environ.get('AXISCOPE_DATA', '~/.config/axiscope'))
+MAPPINGS = MappingStore(os.path.join(DATA_DIR, 'mappings.json')) if VISION_ERROR is None else None
 
 _job_lock = threading.Lock()
 _job = None
@@ -106,12 +112,38 @@ def api_align_start():
                 tool=body.get('tool'),
                 mode=body.get('mode', 'align'),
                 lock=body.get('lock'),
+                store=MAPPINGS,
             )
         except HardwareError as e:
             return _error(str(e))
         _job = job
         job.start()
     return jsonify(job.snapshot())
+
+
+def _mapping_key():
+    # Same key the aligner uses: the snapshot URL the UI sends as camera_url.
+    return request.args.get('camera') or (request.get_json(silent=True) or {}).get('camera')
+
+
+@app.route('/api/mapping', methods=['GET', 'DELETE'])
+def api_mapping():
+    """The saved camera mapping for ?camera=<snapshot url> (GET), or forget it (DELETE)."""
+    err = _vision_required()
+    if err:
+        return err
+    key = _mapping_key()
+    if not key:
+        return _error('camera is required')
+    if request.method == 'DELETE':
+        return jsonify({'deleted': MAPPINGS.delete(key)})
+    entry = MAPPINGS.get(key)
+    if not entry:
+        return jsonify({'mapping': None})
+    import numpy as np
+    info = describe_mapping(np.array(entry['matrix']))
+    info.update(frame=entry['frame'], saved_at=entry['saved_at'])
+    return jsonify({'mapping': info})
 
 
 @app.route('/api/align/status')

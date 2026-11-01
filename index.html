@@ -122,10 +122,14 @@
                 <span class="detection-status-wrap"><span id="detection-status" role="status">Waiting for a frame…</span>
                   <button type="button" class="text-button" id="lock-release" hidden>Release lock</button></span>
                 <div class="detection-buttons">
-                  <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, and turn the view to match the machine">Check orientation</button>
+                  <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, save the mapping and turn the view to match the machine">Map camera</button>
                   <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
                 </div>
               </div>
+              <p class="mapping-status" id="mapping-status" role="status">
+                <span id="mapping-text">No camera mapping saved yet.</span>
+                <button type="button" class="text-button" id="mapping-forget" hidden>Forget</button>
+              </p>
               <ul class="overlay-legend" aria-label="Camera overlay legend">
                 <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M11 0v4M11 10v4M3 7h5M14 7h5" class="lg-cross"/><circle cx="11" cy="7" r="3" class="lg-cross"/></svg>Crosshair · target</li>
                 <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-det"/></svg>Detected nozzle rings</li>
@@ -298,7 +302,7 @@
           <h2 id="align-settings-title">Auto alignment</h2>
           <p>Scan, probe-move to learn the camera scale and orientation, correct, then re-scan. It stops after the iteration limit and always asks you to confirm.</p>
           <div class="settings-grid" id="align-settings"></div>
-          <label class="toggle-label settings-switch"><input id="set-reuse" type="checkbox" role="switch">Reuse camera calibration between tools (skips probe moves)</label>
+          <label class="toggle-label settings-switch"><input id="set-reuse" type="checkbox" role="switch">Use the saved camera mapping (skips the probe moves; re-maps automatically if the camera moved)</label>
           <div class="setup-row">
             <i data-icon="camera"></i>
             <div><b>Vision engine</b><p id="vision-status">Checking…</p></div>

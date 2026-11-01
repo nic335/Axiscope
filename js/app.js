@@ -414,16 +414,26 @@ async function addManualCamera(e) {
 // While Setup is open, look for cameras that were added or came online.
 setInterval(() => { if (S.tab === 'setup' && S.online && !document.hidden) refreshCameras(); }, 15000);
 
+// View rotation/flip is remembered per camera, so a sideways nozzle camera
+// and an upright chamber camera each keep their own orientation.
+function saveOrientation() {
+  if (S.camera) LS.set('orient:' + S.camera.stream, { rotate: S.view.rotate || 0, flipH: S.view.flipH, flipV: S.view.flipV });
+}
+
 function selectCamera(cam, { keepView = false, stay = false } = {}) {
   S.camera = { name: cam.name, stream: cam.stream, snapshot: cam.snapshot };
   LS.set('camera', S.camera);
-  if (!keepView) {
-    S.view.flipH = cam.flipH;
-    S.view.flipV = cam.flipV;
+  const orient = LS.get('orient:' + cam.stream, null);
+  if (orient) {
+    Object.assign(S.view, orient);
+    LS.set('view', S.view);
+  } else if (!keepView) {
+    Object.assign(S.view, { flipH: cam.flipH, flipV: cam.flipV, rotate: 0 });
     LS.set('view', S.view);
   }
   CameraView.setStream(cam.stream);
   Vision.releaseLock();
+  Vision.loadMapping();
   Vision.resetBackoff();
   CameraView.applyView();
   renderCameraList();
@@ -922,9 +932,9 @@ function initEvents() {
   $('btn-motors').addEventListener('click', () => run('M84', 'Motors off'));
 
   $('crosshair-enabled').addEventListener('change', e => { S.view.crosshair = e.target.checked; LS.set('view', S.view); renderView(); });
-  $('flip-h').addEventListener('click', () => { S.view.flipH = !S.view.flipH; LS.set('view', S.view); renderView(); });
-  $('flip-v').addEventListener('click', () => { S.view.flipV = !S.view.flipV; LS.set('view', S.view); renderView(); });
-  $('rotate-view').addEventListener('click', () => { S.view.rotate = ((S.view.rotate || 0) + 90) % 360; LS.set('view', S.view); renderView(); });
+  $('flip-h').addEventListener('click', () => { S.view.flipH = !S.view.flipH; LS.set('view', S.view); saveOrientation(); renderView(); });
+  $('flip-v').addEventListener('click', () => { S.view.flipV = !S.view.flipV; LS.set('view', S.view); saveOrientation(); renderView(); });
+  $('rotate-view').addEventListener('click', () => { S.view.rotate = ((S.view.rotate || 0) + 90) % 360; LS.set('view', S.view); saveOrientation(); renderView(); });
   $('contrast').addEventListener('input', e => { S.view.contrast = Number(e.target.value); LS.set('view', S.view); CameraView.applyView(); });
   const zoomBy = d => {
     const i = ZOOM_STEPS.findIndex(z => z >= S.view.zoom - 1e-6);

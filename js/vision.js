@@ -12,7 +12,7 @@ const DETECTION_KEYS = ['min_radius', 'max_radius', 'hough_votes', 'canny_low', 
 
 const ALIGN_DEFAULTS = {
   max_iterations: 5, tolerance: 0.01, probe_distance: 0.5, max_move: 3.0,
-  settle: 0.4, samples: 3, feed: 10, approach: 0, reuse_calibration: false,
+  settle: 0.4, samples: 3, feed: 10, approach: 0, reuse_calibration: true,
 };
 const ALIGN_FIELDS = [
   { key: 'max_iterations', label: 'Max corrections (N)', min: 1, max: 25, step: 1, unit: '' },
@@ -47,6 +47,11 @@ const Vision = {
   init() {
     this.settings = Object.assign({}, DETECTION_DEFAULTS, LS.get('detection', {}));
     this.align = Object.assign({}, ALIGN_DEFAULTS, LS.get('align', {}));
+    if (!this.align.v) {   // v2: saved mappings became the default
+      this.align.reuse_calibration = true;
+      this.align.v = 2;
+      LS.set('align', this.align);
+    }
     this.buildDetectionControls();
     this.buildAlignSettings();
     this.bindEvents();
@@ -155,6 +160,14 @@ const Vision = {
     });
     $('auto-align').addEventListener('click', () => this.startAlign());
     $('lock-release').addEventListener('click', () => this.releaseLock());
+    $('mapping-forget').addEventListener('click', async () => {
+      if (!S.camera) return;
+      try {
+        await fetch('/api/mapping?camera=' + encodeURIComponent(S.camera.snapshot), { method: 'DELETE' });
+        notice('Camera mapping forgotten. The next Auto align measures it again.');
+      } catch (e) { notice(e.message, 'error'); }
+      this.loadMapping();
+    });
     CameraView.onPick = (x, y) => { if (this.settings.enabled && !S.busy) this.lockAt(x, y); };
     $('check-orientation').addEventListener('click', () => this.startAlign('orient'));
     $('align-orient').addEventListener('click', () => {
@@ -223,6 +236,7 @@ const Vision = {
       this.pollJob();
     }
     this.renderEligibility();
+    this.loadMapping();
     this.schedule(true);
   },
 
@@ -385,6 +399,7 @@ const Vision = {
       this.showJob(job);
       if (TERMINAL.includes(job.state) || job.state === 'idle') {
         S.busy = false;
+        this.loadMapping();
         if (job.state === 'failed') notice('Auto alignment stopped: ' + job.message, 'error');
         $('align-panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         poll();
@@ -466,12 +481,32 @@ const Vision = {
     $('align-orient').hidden = orient || !(r && r.mapping);
   },
 
+  // Saved mapping for the current camera (from the backend).
+  async loadMapping() {
+    this.mapping = null;
+    if (S.camera && this.available && this.available.opencv) {
+      try {
+        this.mapping = (await Api.call('/api/mapping?camera=' + encodeURIComponent(S.camera.snapshot))).mapping;
+      } catch (e) { /* shown as "none saved" */ }
+    }
+    const m = this.mapping;
+    setText('mapping-text', m
+      ? `Camera mapping saved ${new Date(m.saved_at * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}: `
+        + `${Math.round(m.px_per_mm)} px/mm, +X moves the image ${m.x_dir}, +Y moves it ${m.y_dir}.`
+      : 'No camera mapping saved yet. Map camera once, or the first Auto align measures it.');
+    $('mapping-forget').hidden = !m;
+    setText('check-orientation', m ? 'Redo mapping' : 'Map camera');
+    // A camera without a view orientation of its own gets one from the mapping.
+    if (m && S.camera && !LS.get('orient:' + S.camera.stream, null)) this.applyOrientation(m, true);
+  },
+
   // Rotate/flip the camera *view* so +X is right and +Y is up on screen.
   // Detection and moves use the raw frame, so this is purely visual.
   applyOrientation(mapping, quiet) {
     const t = viewForMapping(mapping);
     Object.assign(S.view, { rotate: t.rotate, flipH: t.flipH, flipV: t.flipV });
     LS.set('view', S.view);
+    saveOrientation();
     renderView();
     if (!quiet) notice(`View turned ${t.rotate}°${t.flipH ? ' and mirrored' : ''}: the jog arrows now match the screen.`);
   },
