@@ -121,8 +121,10 @@
               </div>
               <div class="detection-result">
                 <span class="detection-status-wrap"><span id="detection-status" role="status">Waiting for a frame…</span>
-                  <button type="button" class="text-button" id="lock-release" hidden title="Forget the tracked circle and search the whole frame again">Release lock</button></span>
+                  <button type="button" class="text-button" id="lock-release" hidden title="Forget the tracked circle and search the whole frame again">Release lock</button>
+                  <button id="tune-undo" class="text-button" type="button" hidden>Undo auto-tune</button></span>
                 <div class="detection-buttons">
+                  <button id="auto-tune" class="secondary" type="button" title="Find detection settings automatically. Without a locked target it moves X by 0.3 mm and back to tell the nozzle from static circles.">Auto-tune</button>
                   <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, save the mapping and turn the view to match the machine">Map camera</button>
                   <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
                 </div>
@@ -152,6 +154,7 @@
                     <label class="toggle-label"><input id="circle-concentric" type="checkbox" role="switch">Require concentric rings</label>
                     <label class="toggle-label"><input id="circle-overlay" type="checkbox" role="switch">Show circle overlay</label>
                     <label class="toggle-label"><input id="circle-edges" type="checkbox" role="switch">Show edge map</label>
+                    <label class="toggle-label" title="Zoom in on the nozzle and detection, alignment and auto-tune only look at the visible part of the image: faster, and nothing outside it can be mistaken for the nozzle."><input id="circle-zoom-roi" type="checkbox" role="switch">Search only the zoomed-in area</label>
                     <button id="detection-reset" class="text-button" type="button">Reset tuning</button>
                   </div>
                   <p><b>Canny high</b> is how strong a brightness change must be to <i>start</i> an edge; <b>Canny low</b> is how weak it may get while <i>continuing</i> one. Raise both if speckles and texture light up; lower them if the nozzle's rings break into pieces. Keep low at roughly a third to a half of high.</p>

@@ -157,7 +157,8 @@ class AutoAligner:
     """Runs one alignment. Thread-safe status via snapshot()."""
 
     def __init__(self, printer, camera, detect_params=None, settings=None,
-                 target=None, camera_key=None, tool=None, mode="align", lock=None, store=None):
+                 target=None, camera_key=None, tool=None, mode="align", lock=None, store=None,
+                 roi=None):
         self.printer = printer
         self.camera = camera
         self.detect_params = detect_params or {}
@@ -169,6 +170,7 @@ class AutoAligner:
         # Target the user locked in the live view: the first scan stays on it.
         self.initial_lock = lock if isinstance(lock, dict) else None
         self.store = store if store is not None else _memory_store
+        self.roi = roi   # search only this part of the frame (the zoomed-in area)
         self._frame = None
         self._settle_note = ""
         self._lock = threading.Lock()
@@ -259,7 +261,7 @@ class AutoAligner:
         prev, frames = None, 0
         while time.time() < deadline:
             self._check_cancel()
-            res = detect(self.camera.frame(), self.detect_params, hint=hint, lock=lock)
+            res = detect(self.camera.frame(), self.detect_params, hint=hint, lock=lock, roi=self.roi)
             frames += 1
             b = res["best"]
             if lock and res.get("locked") is False:
@@ -292,7 +294,7 @@ class AutoAligner:
         for i in range(s["samples"]):
             self._check_cancel()
             img = self.camera.frame()
-            res = detect(img, self.detect_params, hint=hint, lock=lock)
+            res = detect(img, self.detect_params, hint=hint, lock=lock, roi=self.roi)
             last = res
             b = res["best"]
             if lock and res.get("locked") is False:

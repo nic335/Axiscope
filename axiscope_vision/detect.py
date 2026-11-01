@@ -284,7 +284,39 @@ def _evaluate(index, cx, cy, params):
     }
 
 
-def detect(img, params=None, hint=None, want_edges=False, lock=None):
+def _roi_box(roi, w, h):
+    """Clamp an [x0, y0, x1, y1] region; None if it is (nearly) the whole frame."""
+    if not roi or len(roi) != 4:
+        return None
+    x0, y0, x1, y1 = (int(round(float(v))) for v in roi)
+    x0, x1 = max(0, min(x0, x1)), min(w, max(x0, x1))
+    y0, y1 = max(0, min(y0, y1)), min(h, max(y0, y1))
+    if x1 - x0 < 64 or y1 - y0 < 64:
+        return None
+    if (x1 - x0) * (y1 - y0) >= 0.98 * w * h:
+        return None
+    return x0, y0, x1, y1
+
+
+def crop_roi(img, roi):
+    """(cropped image, (x0, y0)) for a region; the full image if roi is None."""
+    box = _roi_box(roi, img.shape[1], img.shape[0])
+    if box is None:
+        return img, (0, 0)
+    x0, y0, x1, y1 = box
+    return img[y0:y1, x0:x1], (x0, y0)
+
+
+def shift_result(res, dx, dy, width, height):
+    """Map a detection result from a crop back to full-frame coordinates."""
+    for r in ([res["best"]] if res["best"] else []) + res["candidates"]:
+        r["x"] += dx
+        r["y"] += dy
+    res.update(width=int(width), height=int(height))
+    return res
+
+
+def detect(img, params=None, hint=None, want_edges=False, lock=None, roi=None):
     """
     Find the nozzle in a BGR image.
 
@@ -294,10 +326,24 @@ def detect(img, params=None, hint=None, want_edges=False, lock=None):
           (all optional). A candidate within `radius` of (x, y) that shares a
           ring radius with `rings` wins over any stronger circle elsewhere.
           out["locked"] says whether the lock was found.
+    roi:  optional [x0, y0, x1, y1]: only search this part of the frame (e.g.
+          the area the user zoomed into). Results stay in full-frame pixels.
 
     Returns a dict with image size, the best detection (or None), the other
     candidates and timing information.
     """
+    if roi is not None:
+        box = _roi_box(roi, img.shape[1], img.shape[0])
+        if box is not None:
+            x0, y0, x1, y1 = box
+            if hint is not None:
+                hint = (hint[0] - x0, hint[1] - y0)
+            if lock and lock.get("x") is not None:
+                lock = dict(lock, x=float(lock["x"]) - x0, y=float(lock["y"]) - y0)
+            out = detect(img[y0:y1, x0:x1], params, hint, want_edges, lock)
+            shift_result(out, x0, y0, img.shape[1], img.shape[0])
+            out["roi"] = [x0, y0, x1, y1]
+            return out
     t0 = time.perf_counter()
     p = merge_params(params)
     H, W = img.shape[:2]
@@ -429,7 +475,7 @@ def _detect_scaled(img, p, hint, want_edges, lock=None):
 PIPELINE_STAGES = ("gray", "contrast", "blur", "edges", "detection")
 
 
-def pipeline_view(img, params=None, stage="edges", lock=None, max_width=960):
+def pipeline_view(img, params=None, stage="edges", lock=None, max_width=960, roi=None):
     """
     One stage of the detection pipeline as a viewable BGR image, so the
     effect of the tuning sliders can be watched live:
@@ -440,6 +486,9 @@ def pipeline_view(img, params=None, stage="edges", lock=None, max_width=960):
       detection  the frame with the detected rings drawn on it
     Works at the detector's processing scale (capped at max_width).
     """
+    img, (ox, oy) = crop_roi(img, roi)   # show what the detector searches
+    if lock and lock.get("x") is not None and (ox or oy):
+        lock = dict(lock, x=float(lock["x"]) - ox, y=float(lock["y"]) - oy)
     p = merge_params(params)
     H, W = img.shape[:2]
     width = min(W, max_width, p["process_width"] or W)

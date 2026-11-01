@@ -385,3 +385,79 @@ def test_pipeline_view_stages():
     det = pipeline_view(img, PARAMS, "detection")
     plain = cv2.resize(img, (960, 540), interpolation=cv2.INTER_AREA)
     assert np.abs(det.astype(int) - plain).sum() > 0
+
+
+# --- autotune ---
+from axiscope_vision.tune import TuneError, autotune  # noqa: E402
+
+
+def noisy_frames(cx, cy, n=3, noise=18):
+    return [render_nozzle(cx, cy, noise=noise, seed=40 + i) for i in range(n)]
+
+
+def test_autotune_fixes_settings_that_fail_on_a_noisy_camera():
+    frames = noisy_frames(600, 380)
+    d = detect(frames[0], PARAMS)["best"]                    # defaults miss or misplace it here
+    assert d is None or np.hypot(d["x"] - 600, d["y"] - 380) > 3
+    res = autotune(frames, PARAMS, lock={"x": 602, "y": 377})
+    p = res["params"]
+    assert res["quality"]["found"] == 3
+    best = detect(noisy_frames(600, 380, n=1, noise=18)[0], p)["best"]
+    assert best is not None and np.hypot(best["x"] - 600, best["y"] - 380) < 1.0
+    assert p["min_radius"] < 55 and p["max_radius"] >= 90   # brackets the main rings (55, 90)
+
+
+def test_autotune_uses_motion_to_reject_a_static_decoy():
+    frames = [add_decoy(render_nozzle(500, 420, seed=50 + i)) for i in range(3)]
+    moved = [add_decoy(render_nozzle(500, 420 + 0.3 * 380, seed=60 + i)) for i in range(2)]
+    res = autotune(frames, PARAMS, moved_frames=moved)
+    assert "moved" in res["target"]["how"] and "stayed put" in res["target"]["how"]
+    assert np.hypot(res["target"]["x"] - 500, res["target"]["y"] - 420) < 1.0
+
+
+def test_autotune_without_any_circle_says_so():
+    blank = [np.full((720, 1280, 3), 60, np.uint8)] * 3
+    with pytest.raises(TuneError):
+        autotune(blank, PARAMS)
+
+
+def test_autotune_recovers_from_unusable_current_settings():
+    frames = [add_decoy(render_nozzle(500, 420, seed=70 + i)) for i in range(3)]
+    moved = [add_decoy(render_nozzle(500, 420 + 0.3 * 380, seed=80 + i)) for i in range(2)]
+    bad = {"min_radius": 2, "max_radius": 600, "canny_low": 5, "canny_high": 30, "blur": 0}
+    res = autotune(frames, bad, moved_frames=moved)
+    assert np.hypot(res["target"]["x"] - 500, res["target"]["y"] - 420) < 1.0
+    assert res["quality"]["found"] == 3
+
+
+# --- region of interest (zoomed-in area) ---
+def test_roi_results_are_in_full_frame_coordinates_and_ignore_outside():
+    img = add_decoy(render_nozzle(500, 420, seed=5))
+    full = detect(img, PARAMS)["best"]
+    assert np.hypot(full["x"] - DECOY[0], full["y"] - DECOY[1]) < 3        # decoy wins full-frame
+    out = detect(img, PARAMS, roi=[300, 220, 700, 620])                    # zoomed on the nozzle
+    b = out["best"]
+    assert out["roi"] == [300, 220, 700, 620] and out["width"] == 1280
+    assert np.hypot(b["x"] - 500, b["y"] - 420) < 0.5                      # decoy outside is ignored
+
+
+def test_roi_of_2x_zoom_keeps_full_resolution():
+    img = render_nozzle(640.3, 360.7, seed=6)
+    out = detect(img, PARAMS, roi=[320, 180, 960, 540])                    # 640 px wide: no downscale
+    assert out["scale"] == 1.0
+    assert np.hypot(out["best"]["x"] - 640.3, out["best"]["y"] - 360.7) < 0.3
+
+
+def test_roi_whole_frame_or_tiny_is_ignored():
+    img = render_nozzle(640, 360, seed=7)
+    assert "roi" not in detect(img, PARAMS, roi=[0, 0, 1280, 720])
+    assert "roi" not in detect(img, PARAMS, roi=[600, 300, 620, 320])     # too small to be useful
+
+
+def test_autoalign_within_roi_ignores_decoy_without_lock():
+    rig = DecoyRig(start=(150.2, 149.85))
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.005), roi=[240, 60, 1040, 660])
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    assert np.hypot(*(rig.nozzle_px() - [rig.w / 2, rig.h / 2])) < 3

@@ -7,6 +7,7 @@ const DETECTION_DEFAULTS = {
   min_radius: 8, max_radius: 200, hough_votes: 30,
   canny_low: 40, canny_high: 120, blur: 5, min_coverage: 0.45,
   require_concentric: true,
+  zoom_roi: true,       // search only the zoomed-in (visible) part of the frame
 };
 const DETECTION_KEYS = ['min_radius', 'max_radius', 'hough_votes', 'canny_low', 'canny_high', 'blur', 'min_coverage', 'require_concentric'];
 
@@ -25,7 +26,7 @@ const ALIGN_FIELDS = [
   { key: 'approach', label: 'Backlash approach', min: 0, max: 2, step: 0.05, unit: 'mm' },
 ];
 // Backend features this page uses (see API_FEATURES in app.py).
-const NEEDED_FEATURES = ['detect', 'align', 'orient', 'lock', 'mapping', 'vision_frame'];
+const NEEDED_FEATURES = ['detect', 'align', 'orient', 'lock', 'mapping', 'vision_frame', 'autotune', 'roi'];
 const RESTART_HINT = 'Restart the axiscope service (Mainsail → Services → axiscope → Restart, or sudo systemctl restart axiscope).';
 
 const TERMINAL = ['converged', 'not_converged', 'calibrated', 'failed', 'cancelled'];
@@ -66,6 +67,11 @@ const Vision = {
   save() {
     LS.set('detection', this.settings);
     LS.set('align', this.align);
+  },
+
+  // Area to search: the visible part of the image when zoomed in.
+  roi() {
+    return this.settings.zoom_roi ? CameraView.visibleRoi() : null;
   },
 
   params() {
@@ -137,6 +143,7 @@ const Vision = {
     $('circle-concentric').checked = s.require_concentric;
     $('circle-overlay').checked = s.overlay;
     $('circle-edges').checked = s.edges;
+    $('circle-zoom-roi').checked = s.zoom_roi;
     Object.entries(this.dials).forEach(([k, d]) => d.set(k === 'min_coverage' ? Math.round(s[k] * 100) : s[k]));
     ALIGN_FIELDS.forEach(f => { $('set-' + f.key).value = this.align[f.key]; });
     $('set-reuse').checked = this.align.reuse_calibration;
@@ -155,6 +162,7 @@ const Vision = {
       renderWorkflow();
       this.schedule(true);
     });
+    $('circle-zoom-roi').addEventListener('change', e => { s.zoom_roi = e.target.checked; this.save(); this.kick(); });
     $('circle-concentric').addEventListener('change', e => { s.require_concentric = e.target.checked; this.save(); this.kick(); });
     $('circle-overlay').addEventListener('change', e => { s.overlay = e.target.checked; this.save(); this.renderSettings(); });
     $('circle-edges').addEventListener('change', e => { s.edges = e.target.checked; this.save(); if (!s.edges) CameraView.setDetection(this.last); this.kick(); });
@@ -166,6 +174,17 @@ const Vision = {
     });
     $('auto-align').addEventListener('click', () => this.startAlign());
     $('lock-release').addEventListener('click', () => this.releaseLock());
+    $('auto-tune').addEventListener('click', () => this.autoTune());
+    $('tune-undo').addEventListener('click', () => {
+      if (!this._beforeTune) return;
+      Object.assign(this.settings, this._beforeTune);
+      this._beforeTune = null;
+      $('tune-undo').hidden = true;
+      this.save();
+      this.renderSettings();
+      this.releaseLock();
+      notice('Auto-tune undone; previous settings restored.');
+    });
     $('mapping-forget').addEventListener('click', async () => {
       if (!S.camera) return;
       try {
@@ -283,7 +302,7 @@ const Vision = {
     if (this._inflight || !this.shouldDetect()) return;
     this._inflight = true;
     try {
-      const res = await Api.detect({ camera_url: S.camera.snapshot, params: this.params(), edges: this.settings.edges, lock: this.lock });
+      const res = await Api.detect({ camera_url: S.camera.snapshot, params: this.params(), edges: this.settings.edges, lock: this.lock, roi: this.roi() });
       this.last = res;
       this._fails = 0;
       this.updateLock(res);
@@ -363,7 +382,8 @@ const Vision = {
       : this.lock.x == null ? ` · ${kind}, searching by ring size`
       : res.locked === false ? ` · ${kind} target not found, showing best circle`
       : ` · ${kind}`;
-    el.textContent = `${b.rings.length} ring${b.rings.length === 1 ? '' : 's'} · r ${radii} px · ${d.toFixed(1)} px from crosshair · ${Math.round(res.ms)} ms${lockNote}`;
+    const area = res.roi ? ` · zoomed area ${res.roi[2] - res.roi[0]}×${res.roi[3] - res.roi[1]}` : '';
+    el.textContent = `${b.rings.length} ring${b.rings.length === 1 ? '' : 's'} · r ${radii} px · ${d.toFixed(1)} px from crosshair · ${Math.round(res.ms)} ms${area}${lockNote}`;
   },
 
   renderEligibility() {
@@ -383,7 +403,53 @@ const Vision = {
       $(id).title = why;
     });
     $('jog-align-circle').classList.toggle('detection-active', this.settings.enabled);
+    const canTune = this.available && this.available.opencv && S.camera && this.settings.enabled && !S.busy
+      && !(this.missing || []).includes('autotune');
+    $('auto-tune').disabled = !canTune;
+    $('auto-tune').title = canTune ? 'Find detection settings automatically. Without a clicked lock it moves X by 0.3 mm and back to tell the nozzle from static circles.'
+      : S.busy ? 'Busy' : 'Enable circle detection and select a camera first';
     $('camera-viewport').classList.toggle('can-pick', this.settings.enabled && !S.busy);
+  },
+
+  // ------------------------------------------------------------ auto-tune
+  async autoTune() {
+    if (S.busy || !S.camera) return;
+    const lock = this.lock && this.lock.x != null && this.userLock ? this.lock : null;
+    S.busy = true;
+    renderBusy();
+    clearTimeout(this._timer);
+    $('auto-tune').disabled = true;
+    setText('detection-status', lock
+      ? 'Auto-tuning on the locked target…'
+      : 'Auto-tuning: moving X by 0.3 mm and back to find the nozzle, then trying settings…');
+    try {
+      const r = await Api.call('/api/autotune', {
+        camera_url: S.camera.snapshot, params: this.params(), lock,
+        printer: S.host, move: true, roi: this.roi(),
+      });
+      this._beforeTune = {};
+      Object.keys(r.params).forEach(k => { this._beforeTune[k] = this.settings[k]; });
+      Object.assign(this.settings, r.params);
+      this.save();
+      this.renderSettings();
+      // Lock onto the nozzle autotune identified.
+      const t = r.target;
+      this.lock = { x: t.x, y: t.y, radius: Math.max(40, 0.6 * Math.max(...t.rings)), rings: t.rings };
+      this._lockMisses = 0;
+      $('tune-undo').hidden = false;
+      const p = r.params, q = r.quality;
+      notice(`Auto-tuned in ${r.seconds} s (nozzle ${t.how}): radius ${p.min_radius}–${p.max_radius} px, `
+        + `blur ${p.blur < 3 ? 'off' : p.blur}, Canny ${p.canny_low}/${p.canny_high}, coverage ${Math.round(p.min_coverage * 100)}%. `
+        + `Found it in ${q.found}/${q.frames} frames, jitter ${q.jitter_px} px.${r.note ? ' ' + r.note : ''}`);
+    } catch (e) {
+      notice('Auto-tune failed: ' + e.message, 'error');
+    } finally {
+      S.busy = false;
+      $('auto-tune').disabled = false;
+      renderBusy();
+      poll();
+      this.schedule(true);
+    }
   },
 
   // ------------------------------------------------------- auto alignment
@@ -404,6 +470,7 @@ const Vision = {
         mode,
         // Start from the locked target when its position is known.
         lock: this.lock && this.lock.x != null ? this.lock : null,
+        roi: this.roi(),
       });
       this.showJob(job);
       // The panel sits below the camera; bring it into view.

@@ -123,6 +123,23 @@ const CameraView = {
     return [pt.x, pt.y];
   },
 
+  // The part of the source frame visible in the viewport (after zoom, flip,
+  // rotation and letterboxing), as [x0, y0, x1, y1]; null when it's all visible.
+  visibleRoi() {
+    const f = this.frame;
+    const ctm = this.overlay.getScreenCTM();
+    if (!f || !ctm) return null;
+    const r = this.viewport.getBoundingClientRect();
+    const inv = ctm.inverse();
+    const pts = [[r.left, r.top], [r.right, r.top], [r.left, r.bottom], [r.right, r.bottom]]
+      .map(([x, y]) => new DOMPoint(x, y).matrixTransform(inv));
+    const clampX = v => Math.max(0, Math.min(f.width, v)), clampY = v => Math.max(0, Math.min(f.height, v));
+    const x0 = clampX(Math.min(...pts.map(p => p.x))), x1 = clampX(Math.max(...pts.map(p => p.x)));
+    const y0 = clampY(Math.min(...pts.map(p => p.y))), y1 = clampY(Math.max(...pts.map(p => p.y)));
+    if ((x1 - x0) * (y1 - y0) >= 0.98 * f.width * f.height) return null;
+    return [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1)];
+  },
+
   target() {
     const f = this.frame;
     return f ? [f.width / 2, f.height / 2] : null;

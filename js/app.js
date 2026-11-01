@@ -948,6 +948,7 @@ function initEvents() {
     S.view.zoom = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, (i < 0 ? 0 : i) + d))];
     LS.set('view', S.view);
     renderView();
+    Vision.kick();
   };
   $('zoom-in').addEventListener('click', () => zoomBy(1));
   $('zoom-out').addEventListener('click', () => zoomBy(-1));
