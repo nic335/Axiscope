@@ -86,6 +86,51 @@ body { background: var(--canvas, #101211); }
 .overlay-legend .lg-max { stroke: #79d5f5; stroke-width: 1; fill: none; stroke-dasharray: 4 2; }
 .overlay-legend .lg-err { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 3 3; }
 
+/* detection settings in a left column while detection is on */
+.workbench.has-detect { grid-template-columns: 290px minmax(0, 1fr) 310px; }
+.detect-rail { align-self: start; min-width: 0; }
+.detect-rail .detection-body { padding: calc(14px * var(--density)) 14px 14px; }
+.detect-rail .detection-ranges, .detect-rail .detection-advanced-body .detection-ranges { grid-template-columns: 1fr !important; gap: 12px; }
+.detect-rail .detection-result { flex-direction: column; align-items: stretch; gap: 10px; }
+.detect-rail .detection-buttons { justify-content: stretch; }
+.detect-rail .detection-buttons button { flex: 1 1 auto; justify-content: center; }
+.detect-rail .detection-buttons .primary { width: 100%; flex-basis: 100%; }
+.detect-rail .detection-toggles { flex-direction: column; align-items: flex-start; }
+.detect-rail .detection-toggles .text-button { margin-left: 0; }
+.detect-rail .overlay-legend { flex-direction: column; gap: 4px; }
+.detect-rail input:focus-visible, .detect-rail summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.detect-rail .detection-advanced { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 9px; }
+.detect-rail .detection-advanced summary { font-size: 11px; color: #a3ac9f; cursor: pointer; }
+@media (max-width: 1350px) {
+  .workbench.has-detect { grid-template-columns: minmax(0, 1fr) 310px; }
+  .workbench.has-detect .detect-rail { grid-column: 1 / -1; order: 3; }
+  .workbench.has-detect .detect-rail .detection-ranges { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .workbench.has-detect .detect-rail .detection-result { flex-direction: row; align-items: center; justify-content: space-between; }
+  .workbench.has-detect .detect-rail .detection-buttons .primary { width: auto; flex-basis: auto; }
+  .workbench.has-detect .detect-rail .overlay-legend { flex-direction: row; }
+}
+@media (max-width: 760px) {
+  .workbench.has-detect { grid-template-columns: 1fr; }
+  .workbench.has-detect .detect-rail .detection-ranges { grid-template-columns: 1fr !important; }
+  .workbench.has-detect .detect-rail .detection-result { flex-direction: column; align-items: stretch; }
+}
+
+/* two dots on one track (min/max pair) */
+.range-control { display: block; font-size: 11px; min-width: 0; }
+.range-head { display: flex; justify-content: space-between; gap: 8px; color: #b4bdaf; }
+.range-head output { font: 11px monospace; color: var(--accent); white-space: nowrap; }
+.range-track { position: relative; height: 26px; margin: 4px 0 2px; }
+.range-track::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; background: var(--canvas); border: 1px solid var(--line); border-radius: 3px; }
+.range-fill { position: absolute; top: 50%; height: 4px; margin-top: -2px; background: var(--accent); border-radius: 3px; }
+.range-track input { position: absolute; inset: 0; width: 100%; height: 26px; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.range-track input::-webkit-slider-runnable-track { background: none; height: 26px; }
+.range-track input::-moz-range-track { background: none; }
+.range-track input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 16px; height: 16px; margin-top: 5px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); cursor: ew-resize; }
+.range-track input::-moz-range-thumb { pointer-events: auto; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); cursor: ew-resize; }
+.range-track input:focus-visible { outline: none; }
+.range-track input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 3px; }
+.range-track input:focus-visible::-moz-range-thumb { outline: 2px solid var(--accent); outline-offset: 3px; }
+
 /* ---- auto alignment ---- */
 .align-panel { border-top: 1px solid var(--line); padding: calc(15px * var(--density)); background: color-mix(in srgb, var(--surface), var(--accent) 4%); }
 .align-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

@@ -51,7 +51,58 @@
         <span class="session-tag" id="session-tag">MANUAL XY</span>
       </section>
 
-      <div class="workbench">
+      <div class="workbench" id="workbench">
+        <aside class="detect-rail panel" id="detect-rail" aria-labelledby="detect-rail-title" hidden>
+          <div class="panel-head"><h2 id="detect-rail-title">◎ Circle detection</h2><span class="mini-label" id="det-engine-rail">OPENCV</span></div>
+            <div class="detection-body" id="detection-body">
+              <div class="detection-ranges">
+                <div data-range="radius"></div>
+                <div data-dial="hough_votes"></div>
+              </div>
+              <div class="detection-result">
+                <span class="detection-status-wrap"><span id="detection-status" role="status">Waiting for a frame…</span>
+                  <button type="button" class="text-button" id="lock-release" hidden title="Forget the tracked circle and search the whole frame again">Release lock</button>
+                  <button id="tune-undo" class="text-button" type="button" hidden>Undo auto-tune</button></span>
+                <div class="detection-buttons">
+                  <button id="auto-tune" class="secondary" type="button" title="Find detection settings automatically. Without a locked target it moves X by 0.3 mm and back to tell the nozzle from static circles.">Auto-tune</button>
+                  <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, save the mapping and turn the view to match the machine">Map camera</button>
+                  <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
+                </div>
+              </div>
+              <p class="mapping-status" id="mapping-status" role="status">
+                <span id="mapping-text">No camera mapping saved yet.</span>
+                <button type="button" class="text-button" id="mapping-forget" hidden>Forget</button>
+              </p>
+              <ul class="overlay-legend" aria-label="Camera overlay legend">
+                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M11 0v4M11 10v4M3 7h5M14 7h5" class="lg-cross"/><circle cx="11" cy="7" r="3" class="lg-cross"/></svg>Crosshair · target</li>
+                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="3" class="lg-min"/><circle cx="11" cy="7" r="6.5" class="lg-max"/></svg>Min / max radius (blue)</li>
+                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-det"/></svg>Detected nozzle rings</li>
+                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-lock"/></svg>Locked nozzle (solid)</li>
+                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-cand"/></svg>Other circles found</li>
+                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M2 11L20 3" class="lg-err"/></svg>Offset to crosshair</li>
+              </ul>
+              <details class="detection-advanced">
+                <summary>Advanced tuning</summary>
+                <div class="detection-advanced-body">
+                  <div class="detection-ranges">
+                    <div data-dial="canny_low"></div>
+                    <div data-dial="canny_high"></div>
+                    <div data-dial="blur"></div>
+                    <div data-dial="min_coverage"></div>
+                  </div>
+                  <div class="detection-toggles">
+                    <label class="toggle-label"><input id="circle-concentric" type="checkbox" role="switch">Require concentric rings</label>
+                    <label class="toggle-label"><input id="circle-overlay" type="checkbox" role="switch">Show circle overlay</label>
+                    <label class="toggle-label"><input id="circle-edges" type="checkbox" role="switch">Show edge map</label>
+                    <label class="toggle-label" title="Zoom in on the nozzle and detection, alignment and auto-tune only look at the visible part of the image: faster, and nothing outside it can be mistaken for the nozzle."><input id="circle-zoom-roi" type="checkbox" role="switch">Search only the zoomed-in area</label>
+                    <button id="detection-reset" class="text-button" type="button">Reset tuning</button>
+                  </div>
+                  <p><b>Canny high</b> is how strong a brightness change must be to <i>start</i> an edge; <b>Canny low</b> is how weak it may get while <i>continuing</i> one. Raise both if speckles and texture light up; lower them if the nozzle's rings break into pieces. Keep low at roughly a third to a half of high.</p>
+                  <p>Radii are source-image pixels, independent of zoom. A nozzle usually shows two or more rings (orifice and tip face); requiring concentric rings rejects stray single circles. Use the edge map to tune Canny and blur: the rings should be clean, unbroken lines.</p>
+                </div>
+              </details>
+            </div>
+        </aside>
         <section class="camera-panel panel">
           <div class="panel-head">
             <h2><i data-icon="camera" data-size="16"></i>Alignment camera</h2>
@@ -109,58 +160,9 @@
             <div class="detection-heading">
               <div>
                 <h3 id="detection-title">◎ Circle detection <small id="det-engine">OPENCV</small></h3>
-                <p id="det-sub">Edge detection, then a search for concentric circles. Click the nozzle in the image to lock onto it.</p>
+                <p id="det-sub">Edge detection, then a search for concentric circles. Settings open on the left; click the nozzle in the image to lock onto it.</p>
               </div>
               <label class="detection-switch"><input id="detection-enabled" type="checkbox" role="switch" aria-label="Circle detection"><span id="det-onoff">Off</span></label>
-            </div>
-            <div class="detection-body" id="detection-body" hidden>
-              <div class="detection-ranges">
-                <div data-dial="min_radius"></div>
-                <div data-dial="max_radius"></div>
-                <div data-dial="hough_votes"></div>
-              </div>
-              <div class="detection-result">
-                <span class="detection-status-wrap"><span id="detection-status" role="status">Waiting for a frame…</span>
-                  <button type="button" class="text-button" id="lock-release" hidden title="Forget the tracked circle and search the whole frame again">Release lock</button>
-                  <button id="tune-undo" class="text-button" type="button" hidden>Undo auto-tune</button></span>
-                <div class="detection-buttons">
-                  <button id="auto-tune" class="secondary" type="button" title="Find detection settings automatically. Without a locked target it moves X by 0.3 mm and back to tell the nozzle from static circles.">Auto-tune</button>
-                  <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, save the mapping and turn the view to match the machine">Map camera</button>
-                  <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
-                </div>
-              </div>
-              <p class="mapping-status" id="mapping-status" role="status">
-                <span id="mapping-text">No camera mapping saved yet.</span>
-                <button type="button" class="text-button" id="mapping-forget" hidden>Forget</button>
-              </p>
-              <ul class="overlay-legend" aria-label="Camera overlay legend">
-                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M11 0v4M11 10v4M3 7h5M14 7h5" class="lg-cross"/><circle cx="11" cy="7" r="3" class="lg-cross"/></svg>Crosshair · target</li>
-                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="3" class="lg-min"/><circle cx="11" cy="7" r="6.5" class="lg-max"/></svg>Min / max radius (blue)</li>
-                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-det"/></svg>Detected nozzle rings</li>
-                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-lock"/></svg>Locked nozzle (solid)</li>
-                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="11" cy="7" r="5.5" class="lg-cand"/></svg>Other circles found</li>
-                <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M2 11L20 3" class="lg-err"/></svg>Offset to crosshair</li>
-              </ul>
-              <details class="detection-advanced">
-                <summary>Advanced tuning</summary>
-                <div class="detection-advanced-body">
-                  <div class="detection-ranges">
-                    <div data-dial="canny_low"></div>
-                    <div data-dial="canny_high"></div>
-                    <div data-dial="blur"></div>
-                    <div data-dial="min_coverage"></div>
-                  </div>
-                  <div class="detection-toggles">
-                    <label class="toggle-label"><input id="circle-concentric" type="checkbox" role="switch">Require concentric rings</label>
-                    <label class="toggle-label"><input id="circle-overlay" type="checkbox" role="switch">Show circle overlay</label>
-                    <label class="toggle-label"><input id="circle-edges" type="checkbox" role="switch">Show edge map</label>
-                    <label class="toggle-label" title="Zoom in on the nozzle and detection, alignment and auto-tune only look at the visible part of the image: faster, and nothing outside it can be mistaken for the nozzle."><input id="circle-zoom-roi" type="checkbox" role="switch">Search only the zoomed-in area</label>
-                    <button id="detection-reset" class="text-button" type="button">Reset tuning</button>
-                  </div>
-                  <p><b>Canny high</b> is how strong a brightness change must be to <i>start</i> an edge; <b>Canny low</b> is how weak it may get while <i>continuing</i> one. Raise both if speckles and texture light up; lower them if the nozzle's rings break into pieces. Keep low at roughly a third to a half of high.</p>
-                  <p>Radii are source-image pixels, independent of zoom. A nozzle usually shows two or more rings (orifice and tip face); requiring concentric rings rejects stray single circles. Use the edge map to tune Canny and blur: the rings should be clean, unbroken lines.</p>
-                </div>
-              </details>
             </div>
           </section>
 

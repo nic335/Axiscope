@@ -79,6 +79,48 @@ function buildDial(container, spec, onInput) {
   };
 }
 
+// Two dots on one track for a min/max pair (e.g. the detection radius
+// range). Two native range inputs share the track, so each dot keeps its own
+// label and keyboard control; the dots cannot cross.
+function buildRange(container, spec, onInput) {
+  const fmt = v => v + (spec.unit || '');
+  const { id } = spec;
+  container.outerHTML = `<div class="range-control" id="${id}">
+    <span class="range-head">${esc(spec.label)}<output id="${id}-out">${esc(fmt(spec.lo))} – ${esc(fmt(spec.hi))}</output></span>
+    <div class="range-track">
+      <span class="range-fill" id="${id}-fill"></span>
+      <input type="range" id="${id}-lo" min="${spec.min}" max="${spec.max}" step="${spec.step || 1}" value="${spec.lo}" aria-label="${esc(spec.labelLo)}">
+      <input type="range" id="${id}-hi" min="${spec.min}" max="${spec.max}" step="${spec.step || 1}" value="${spec.hi}" aria-label="${esc(spec.labelHi)}">
+    </div>
+    ${spec.help ? `<small class="dial-help">${esc(spec.help)}</small>` : ''}
+  </div>`;
+  const lo = $(id + '-lo'), hi = $(id + '-hi'), out = $(id + '-out'), fill = $(id + '-fill');
+  const gap = spec.gap || 1;
+  const paint = () => {
+    const span = spec.max - spec.min;
+    fill.style.left = (100 * (lo.value - spec.min) / span) + '%';
+    fill.style.right = (100 * (spec.max - hi.value) / span) + '%';
+    out.textContent = fmt(lo.value) + ' – ' + fmt(hi.value);
+  };
+  const change = which => {
+    let a = Number(lo.value), b = Number(hi.value);
+    if (b - a < gap) {
+      if (which === 'lo') a = b - gap; else b = a + gap;
+      a = Math.max(spec.min, a); b = Math.min(spec.max, b);
+      lo.value = a; hi.value = b;
+    }
+    // The dot moved last stays on top, so two touching dots stay grabbable.
+    lo.style.zIndex = which === 'lo' ? 3 : 2;
+    hi.style.zIndex = which === 'hi' ? 3 : 2;
+    paint();
+    onInput(Number(lo.value), Number(hi.value));
+  };
+  lo.addEventListener('input', () => change('lo'));
+  hi.addEventListener('input', () => change('hi'));
+  paint();
+  return { set(a, b) { if (a != null) lo.value = a; if (b != null) hi.value = b; paint(); } };
+}
+
 // -------------------------------------------------------------------- state
 const S = {
   tab: 'calibration',

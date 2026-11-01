@@ -94,12 +94,20 @@ const Vision = {
           this.kick();
         });
     };
-    dial('min_radius', { label: 'Min radius', min: 2, max: 400, unit: ' px', help: 'Ignore circles smaller than this. Raise it to skip specks and the orifice glint.' }, v => {
-      if (s.max_radius <= v) { s.max_radius = v + 1; this.dials.max_radius.set(s.max_radius); }
+    // Min and max radius work together: two dots on one track.
+    const radius = buildRange(document.querySelector('[data-range="radius"]'), {
+      id: 'circle-radius', label: 'Radius range', labelLo: 'Min radius', labelHi: 'Max radius',
+      min: 2, max: 600, lo: s.min_radius, hi: s.max_radius, unit: ' px', gap: 2,
+      help: 'Only circles between these sizes count. Fit it around the nozzle tip: specks are smaller, the hotend body larger. Shown as blue circles on the crosshair.',
+    }, (lo, hi) => {
+      s.min_radius = lo;
+      s.max_radius = hi;
+      this.updateRadiusGuide();
+      this.save();
+      this.kick();
     });
-    dial('max_radius', { label: 'Max radius', min: 3, max: 600, unit: ' px', help: 'Ignore circles larger than this. Should just fit the nozzle tip.' }, v => {
-      if (s.min_radius >= v) { s.min_radius = v - 1; this.dials.min_radius.set(s.min_radius); }
-    });
+    this.dials.min_radius = { set: v => radius.set(v, null) };
+    this.dials.max_radius = { set: v => radius.set(null, v) };
     dial('hough_votes', { label: 'Vote threshold · param2', min: 5, max: 100, help: 'How round a shape must be to count as a circle. Lower finds more (and more false) circles.' });
     dial('canny_low', { label: 'Canny low', min: 5, max: 250, help: 'How faint an edge may get while it continues. About a third to half of high.' }, v => {
       if (s.canny_high <= v) { s.canny_high = v + 1; this.dials.canny_high.set(s.canny_high); }
@@ -139,7 +147,10 @@ const Vision = {
     const s = this.settings;
     $('detection-enabled').checked = s.enabled;
     $('det-onoff').textContent = s.enabled ? 'On' : 'Off';
-    $('detection-body').hidden = !s.enabled;
+    // Settings live in a left column while detection is on.
+    $('detect-rail').hidden = !s.enabled;
+    $('workbench').classList.toggle('has-detect', s.enabled);
+    CameraView.fit();
     $('circle-concentric').checked = s.require_concentric;
     $('circle-overlay').checked = s.overlay;
     $('circle-edges').checked = s.edges;
@@ -264,6 +275,7 @@ const Vision = {
     $('vision-pill').dataset.state = a.opencv && !this.missing.length ? 'ok' : 'warn';
     if (this.missing.length) $('vision-status').textContent += ' · service needs a restart (' + missingText + ')';
     $('det-engine').textContent = a.opencv ? 'OPENCV ' + a.opencv_version : 'UNAVAILABLE';
+    $('det-engine-rail').textContent = $('det-engine').textContent;
     if (!a.opencv) $('det-sub').textContent = 'OpenCV is not installed on the Axiscope host. Re-run install.sh to enable detection.';
     // Resume a job that was running before a page reload.
     if (a.align && !TERMINAL.includes(a.align.state) && a.align.state !== 'idle') {
