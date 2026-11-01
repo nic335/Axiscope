@@ -6,6 +6,11 @@
 body { background: var(--canvas, #101211); }
 :not(pre) > code { font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; color: #d4dfcc; background: var(--canvas); border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px; }
 
+/* Wider page on big screens (design cap was 1600 px) so the camera grows.
+   The camera's height is capped to the window, the image is fitted inside. */
+main { max-width: 2200px; }
+.workbench .camera-viewport { max-height: calc(100vh - 230px); min-height: 280px; }
+
 /* ---- header / status ---- */
 .brand { background: none; border: 0; color: inherit; padding: 0; }
 #conn-label[data-state="ok"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
