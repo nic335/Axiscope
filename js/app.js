@@ -434,6 +434,7 @@ function selectCamera(cam, { keepView = false, stay = false } = {}) {
   CameraView.setStream(cam.stream);
   Vision.releaseLock();
   Vision.loadMapping();
+  if (window.Minicam && Minicam.el) Minicam.refresh();
   Vision.resetBackoff();
   CameraView.applyView();
   renderCameraList();

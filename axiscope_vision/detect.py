@@ -424,3 +424,63 @@ def _detect_scaled(img, p, hint, want_edges, lock=None):
         ok, jpg = cv2.imencode(".jpg", edges, [cv2.IMWRITE_JPEG_QUALITY, 70])
         out["edges_jpeg"] = jpg.tobytes() if ok else None
     return out
+
+
+PIPELINE_STAGES = ("gray", "contrast", "blur", "edges", "detection")
+
+
+def pipeline_view(img, params=None, stage="edges", lock=None, max_width=960):
+    """
+    One stage of the detection pipeline as a viewable BGR image, so the
+    effect of the tuning sliders can be watched live:
+      gray       grayscale input
+      contrast   after CLAHE (if enabled)
+      blur       after the blur kernel: exactly what Canny sees
+      edges      Canny edge map
+      detection  the frame with the detected rings drawn on it
+    Works at the detector's processing scale (capped at max_width).
+    """
+    p = merge_params(params)
+    H, W = img.shape[:2]
+    width = min(W, max_width, p["process_width"] or W)
+    if W > width:
+        img = cv2.resize(img, (width, int(round(H * width / float(W)))), interpolation=cv2.INTER_AREA)
+    if stage == "detection":
+        res = detect(img, dict(p, process_width=0, min_radius=max(2, int(p["min_radius"] * width / W)),
+                               max_radius=max(3, int(p["max_radius"] * width / W))), lock=_scale_lock(lock, width / W))
+        out = img.copy()
+        for c in res["candidates"]:
+            r = max(g["r"] for g in c["rings"])
+            cv2.circle(out, (int(round(c["x"])), int(round(c["y"]))), int(round(r)), (150, 160, 150), 1, cv2.LINE_AA)
+        b = res["best"]
+        if b is not None:
+            center = (int(round(b["x"] * 16)), int(round(b["y"] * 16)))
+            for g in b["rings"]:
+                cv2.circle(out, center, int(round(g["r"] * 16)), (107, 239, 181), 2, cv2.LINE_AA, shift=4)
+            cv2.drawMarker(out, (int(round(b["x"])), int(round(b["y"]))), (107, 239, 181), cv2.MARKER_CROSS, 14, 1)
+        return out
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+    if stage == "gray":
+        return gray
+    if p["clahe"]:
+        gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    if stage == "contrast":
+        return gray
+    k = int(p["blur"])
+    if k >= 3:
+        k |= 1
+        gray = cv2.GaussianBlur(gray, (k, k), 0)
+    if stage == "blur":
+        return gray
+    return cv2.Canny(gray, p["canny_low"], p["canny_high"], L2gradient=True)
+
+
+def _scale_lock(lock, s):
+    if not lock:
+        return None
+    out = dict(lock)
+    for k in ("x", "y", "radius"):
+        if out.get(k) is not None:
+            out[k] = float(out[k]) * s
+    out["rings"] = [float(r) * s for r in (out.get("rings") or [])]
+    return out

@@ -237,6 +237,7 @@ const Vision = {
     }
     this.renderEligibility();
     this.loadMapping();
+    if (window.Minicam && Minicam.el) Minicam.refresh();
     this.schedule(true);
   },
 

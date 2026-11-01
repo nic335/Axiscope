@@ -1,6 +1,15 @@
 // Minicam: a second camera (e.g. a chamber cam) floating in a screen corner.
 // Drag the window to move it (it snaps to the nearest corner); drag the
 // inner-corner handle, or use arrow keys on it, to resize.
+// Pipeline stages rendered by the backend from the alignment camera.
+const VISION_STAGES = [
+  ['gray', 'Grayscale'],
+  ['contrast', 'Contrast boost (CLAHE)'],
+  ['blur', 'Blurred (input to edges)'],
+  ['edges', 'Edges (Canny)'],
+  ['detection', 'Detection (rings drawn)'],
+];
+
 const Minicam = {
   state: null,   // {open, stream, corner, width}
   el: null, img: null,
@@ -38,12 +47,19 @@ const Minicam = {
     $('minicam-toggle').setAttribute('aria-pressed', open);
     const cams = S.cameras || [];
     // Default to a camera other than the alignment camera.
-    if (!this.state.stream || !cams.some(c => c.stream === this.state.stream)) {
+    const isVision = (this.state.stream || '').startsWith('vision:');
+    if (!this.state.stream || (!isVision && !cams.some(c => c.stream === this.state.stream))) {
       const other = cams.find(c => c.reachable && (!S.camera || c.stream !== S.camera.stream)) || cams[0];
       if (other && open) { this.state.stream = other.stream; this.save(); }
     }
-    setHTML($('minicam-select'), cams.length
-      ? cams.map(c => `<option value="${esc(c.stream)}"${c.stream === this.state.stream ? ' selected' : ''}>${esc(c.name)}${c.reachable ? '' : ' (offline)'}</option>`).join('')
+    const camOpts = cams.map(c => `<option value="${esc(c.stream)}">${esc(c.name)}${c.reachable ? '' : ' (offline)'}</option>`).join('');
+    // The pipeline views need OpenCV and an alignment camera to process.
+    const visionOk = S.camera && Vision.available && Vision.available.opencv;
+    const visOpts = visionOk
+      ? `<optgroup label="Vision pipeline · ${esc(S.camera.name)}">${VISION_STAGES.map(([k, l]) => `<option value="vision:${k}">${l}</option>`).join('')}</optgroup>`
+      : '';
+    setHTML($('minicam-select'), cams.length || visOpts
+      ? (cams.length ? `<optgroup label="Cameras">${camOpts}</optgroup>` : '') + visOpts
       : '<option value="">Connect a printer first</option>');
     $('minicam-select').value = this.state.stream || '';
     this.load();
@@ -51,6 +67,12 @@ const Minicam = {
 
   load() {
     const want = this.state.open && this.state.stream && S.host ? this.state.stream : null;
+    if (want && want.startsWith('vision:')) {
+      this.img.removeAttribute('src');   // drop any MJPEG connection
+      this.startVision(want.slice(7));
+      return;
+    }
+    this.stopVision();
     // Closing drops the MJPEG connection instead of streaming in the background.
     if (!want) {
       if (this.img.getAttribute('src')) this.img.removeAttribute('src');
@@ -68,6 +90,49 @@ const Minicam = {
     this._probe = setInterval(() => {
       if (this.img.naturalWidth > 0) { $('minicam-empty').hidden = true; clearInterval(this._probe); }
     }, 250);
+  },
+
+  // Pipeline views are single processed frames from the backend; poll them
+  // one at a time (never more than one request in flight).
+  startVision(stage) {
+    this._visionStage = stage;
+    if (this._visionLoop) return;
+    $('minicam-empty').textContent = 'Processing…';
+    $('minicam-empty').hidden = false;
+    const tick = async () => {
+      if (!this._visionStage || !this.state.open || !S.camera) { this._visionLoop = null; return; }
+      let wait = 250;
+      if (!document.hidden) {
+        try {
+          const res = await fetch('/api/vision/frame', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+            body: JSON.stringify({ camera_url: S.camera.snapshot, stage: this._visionStage, params: Vision.params(), lock: Vision.lock }),
+          });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+          const url = URL.createObjectURL(await res.blob());
+          const old = this._visionUrl;
+          this._visionUrl = url;
+          this.img.src = url;
+          if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
+          $('minicam-empty').hidden = true;
+        } catch (e) {
+          $('minicam-empty').textContent = 'Vision view unavailable: ' + e.message;
+          $('minicam-empty').hidden = false;
+          wait = 3000;
+        }
+      } else {
+        wait = 1000;
+      }
+      this._visionLoop = setTimeout(tick, wait);
+    };
+    this._visionLoop = setTimeout(tick, 0);
+  },
+
+  stopVision() {
+    this._visionStage = null;
+    clearTimeout(this._visionLoop);
+    this._visionLoop = null;
+    if (this._visionUrl) { URL.revokeObjectURL(this._visionUrl); this._visionUrl = null; }
   },
 
   applyLayout() {

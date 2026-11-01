@@ -187,6 +187,7 @@ To use a stream from anywhere else, enter it under **Setup → Add a camera by s
 - Drag it by the header strip or the video; it snaps to the nearest corner.
 - Resize it from the grip on its inner corner, or focus the grip and use the arrow keys (Shift for bigger steps).
 - Its camera, corner and size are remembered in the browser. Closing it also stops its stream.
+- Under **Vision pipeline** the dropdown also offers what OpenCV sees on the alignment camera, using your current detection settings: *Grayscale*, *Contrast boost (CLAHE)*, *Blurred* (the input to edge detection), *Edges (Canny)* and *Detection* (the frame with the found rings drawn). Keep one of these open while moving the sliders to see what each setting does. These are processed frames from the Axiscope host, about 3–4 per second.
 
 The animations below show the previous interface, but the steps are the same.
 

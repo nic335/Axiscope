@@ -371,3 +371,17 @@ def test_saved_mapping_ignored_at_other_resolution():
     assert st["state"] == "converged"
     assert any(s["phase"] == "probe_x" for s in st["steps"])
     assert store.get("cam")["frame"] == [1280, 720]
+
+
+def test_pipeline_view_stages():
+    from axiscope_vision.detect import PIPELINE_STAGES, pipeline_view
+    img = render_nozzle(640, 360, seed=2)
+    for stage in PIPELINE_STAGES:
+        v = pipeline_view(img, PARAMS, stage)
+        assert v.shape[1] == 960 and v.shape[0] == 540, stage   # processing scale
+    edges = pipeline_view(img, PARAMS, "edges")
+    assert set(np.unique(edges)) <= {0, 255} and edges.any()
+    # The detection view draws the rings: it differs from the plain frame.
+    det = pipeline_view(img, PARAMS, "detection")
+    plain = cv2.resize(img, (960, 540), interpolation=cv2.INTER_AREA)
+    assert np.abs(det.astype(int) - plain).sum() > 0

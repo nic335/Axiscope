@@ -6,11 +6,12 @@ from flask.app import Flask
 from flask.globals import request
 from flask.helpers import send_from_directory
 from flask.json import jsonify
+from flask.wrappers import Response
 
 try:
     import cv2
     from axiscope_vision.align import AlignError, AutoAligner, MappingStore, describe_mapping
-    from axiscope_vision.detect import detect
+    from axiscope_vision.detect import PIPELINE_STAGES, detect, pipeline_view
     from axiscope_vision.hardware import HardwareError, MoonrakerPrinter, SnapshotCamera
     VISION_ERROR = None
 except ImportError as e:  # the manual UI keeps working without OpenCV
@@ -88,6 +89,28 @@ def api_detect():
         res['edges'] = 'data:image/jpeg;base64,' + base64.b64encode(res.pop('edges_jpeg')).decode()
     res.pop('edges_jpeg', None)
     return jsonify(res)
+
+
+@app.route('/api/vision/frame', methods=['POST'])
+def api_vision_frame():
+    """One JPEG of a detection pipeline stage, for watching the tuning live."""
+    err = _vision_required()
+    if err:
+        return err
+    body = request.get_json(silent=True) or {}
+    stage = body.get('stage', 'edges')
+    if stage not in PIPELINE_STAGES:
+        return _error('stage must be one of: ' + ', '.join(PIPELINE_STAGES))
+    try:
+        img = SnapshotCamera(body.get('camera_url')).frame()
+    except HardwareError as e:
+        return _error(str(e), 502)
+    lock = body.get('lock') if isinstance(body.get('lock'), dict) else None
+    view = pipeline_view(img, body.get('params'), stage, lock=lock)
+    ok, jpg = cv2.imencode('.jpg', view, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    if not ok:
+        return _error('Could not encode the image', 500)
+    return Response(jpg.tobytes(), mimetype='image/jpeg')
 
 
 @app.route('/api/align/start', methods=['POST'])
