@@ -63,6 +63,17 @@ body { background: var(--canvas, #101211); }
 .detection-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .detection-buttons .secondary { white-space: nowrap; }
 
+/* slider help + overlay legend */
+.dial-help { display: block; font-size: 10px; line-height: 1.45; color: #8f9a88; margin-top: 2px; }
+.overlay-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); font-size: 10px; color: #a3ac9f; }
+.overlay-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.overlay-legend svg { flex-shrink: 0; overflow: visible; }
+.overlay-legend .lg-cross { stroke: var(--accent); stroke-width: 1; fill: none; opacity: .85; }
+.overlay-legend .lg-det { stroke: var(--accent); stroke-width: 1.6; fill: none; stroke-dasharray: 3 2; }
+.overlay-legend .lg-lock { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+.overlay-legend .lg-cand { stroke: #a3ac9f; stroke-width: 1; fill: none; stroke-dasharray: 1.5 2.5; opacity: .7; }
+.overlay-legend .lg-err { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 3 3; }
+
 /* ---- auto alignment ---- */
 .align-panel { border-top: 1px solid var(--line); padding: calc(15px * var(--density)); background: color-mix(in srgb, var(--surface), var(--accent) 4%); }
 .align-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

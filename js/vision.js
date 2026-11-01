@@ -78,21 +78,21 @@ const Vision = {
           this.kick();
         });
     };
-    dial('min_radius', { label: 'Min radius', min: 2, max: 400, unit: ' px' }, v => {
+    dial('min_radius', { label: 'Min radius', min: 2, max: 400, unit: ' px', help: 'Ignore circles smaller than this. Raise it to skip specks and the orifice glint.' }, v => {
       if (s.max_radius <= v) { s.max_radius = v + 1; this.dials.max_radius.set(s.max_radius); }
     });
-    dial('max_radius', { label: 'Max radius', min: 3, max: 600, unit: ' px' }, v => {
+    dial('max_radius', { label: 'Max radius', min: 3, max: 600, unit: ' px', help: 'Ignore circles larger than this. Should just fit the nozzle tip.' }, v => {
       if (s.min_radius >= v) { s.min_radius = v - 1; this.dials.min_radius.set(s.min_radius); }
     });
-    dial('hough_votes', { label: 'Vote threshold · param2', min: 5, max: 100 });
-    dial('canny_low', { label: 'Canny low', min: 5, max: 250 }, v => {
+    dial('hough_votes', { label: 'Vote threshold · param2', min: 5, max: 100, help: 'How round a shape must be to count as a circle. Lower finds more (and more false) circles.' });
+    dial('canny_low', { label: 'Canny low', min: 5, max: 250, help: 'How faint an edge may get while it continues. About a third to half of high.' }, v => {
       if (s.canny_high <= v) { s.canny_high = v + 1; this.dials.canny_high.set(s.canny_high); }
     });
-    dial('canny_high', { label: 'Canny high · param1', min: 10, max: 400 }, v => {
+    dial('canny_high', { label: 'Canny high · param1', min: 10, max: 400, help: 'How sharp a light/dark change must be to start an edge. Raise if texture lights up.' }, v => {
       if (s.canny_low >= v) { s.canny_low = v - 1; this.dials.canny_low.set(s.canny_low); }
     });
-    dial('blur', { label: 'Blur kernel', min: 0, max: 15, format: v => (v < 3 ? 'off' : (v | 1) + ' px') });
-    dial('min_coverage', { label: 'Min ring coverage', min: 10, max: 100, unit: '%' });
+    dial('blur', { label: 'Blur kernel', min: 0, max: 15, format: v => (v < 3 ? 'off' : (v | 1) + ' px'), help: 'Smooths noise and grain before edges are found. Raise for noisy or speckled images.' });
+    dial('min_coverage', { label: 'Min ring coverage', min: 10, max: 100, unit: '%', help: 'How much of a ring must be visible edge. Lower if rings are partly hidden or glared.' });
   },
 
   buildAlignSettings() {

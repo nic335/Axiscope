@@ -64,7 +64,8 @@ function buildDial(container, spec, onInput) {
   const fmt = spec.format || (v => v + (spec.unit || ''));
   container.outerHTML = `<label class="detection-control" for="${spec.id}">
     <span>${esc(spec.label)}<output for="${spec.id}" id="${spec.id}-out">${esc(fmt(spec.value))}</output></span>
-    <input id="${spec.id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step || 1}" value="${spec.value}">
+    <input id="${spec.id}" type="range" min="${spec.min}" max="${spec.max}" step="${spec.step || 1}" value="${spec.value}"${spec.help ? ` aria-describedby="${spec.id}-help"` : ''}>
+    ${spec.help ? `<small class="dial-help" id="${spec.id}-help">${esc(spec.help)}</small>` : ''}
   </label>`;
   const input = $(spec.id), out = $(spec.id + '-out');
   input.addEventListener('input', () => {
