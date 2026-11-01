@@ -21,6 +21,17 @@ function store(kind) {
 const LS = store('local');
 const SS = store('session');
 
+// Write only on change: rewriting identical text every poll would clear the
+// user's text selection (and cost layout work).
+function setText(id, text) {
+  const el = typeof id === 'string' ? $(id) : id;
+  if (el.textContent !== text) el.textContent = text;
+}
+function setHTML(id, html) {
+  const el = typeof id === 'string' ? $(id) : id;
+  if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+}
+
 function notice(message, kind = 'info') {
   const n = $('notice');
   n.textContent = message || '';
@@ -187,11 +198,12 @@ function navigate(tab) {
   ['calibration', 'offsets', 'setup'].forEach(t => { $('view-' + t).hidden = t !== tab; });
   $('page-heading').hidden = tab === 'calibration';
   if (HEADINGS[tab]) {
-    $('page-title').textContent = HEADINGS[tab][0];
-    $('page-sub').textContent = HEADINGS[tab][1];
+    setText('page-title', HEADINGS[tab][0]);
+    setText('page-sub', HEADINGS[tab][1]);
   }
   notice('');
   if (tab === 'calibration') CameraView.fit();
+  if (tab === 'setup' && S.online) refreshCameras();
   Vision.schedule();
 }
 
@@ -206,19 +218,19 @@ async function connect(host, { auto = false } = {}) {
   }
   stopPolling();
   // Without a port, Moonraker may sit behind the web server (:80) or on its
-  // own default port (:7125). Probe both at once and take the first answer.
+  // own default port (:7125). Probe both at once; prefer :80 when both answer,
+  // because camera proxy paths (/webcam/, /webcam2/) are served there.
   const hasPort = /:\d+$/.test(host);
   const candidates = hasPort ? [host] : [host, host + ':7125'];
   status.textContent = 'Looking for Moonraker on ' + candidates.join(' and ') + '…';
   status.dataset.kind = '';
   $('connect-btn').disabled = true;
   try {
-    let info;
-    try {
-      ({ host, info } = await Promise.any(candidates.map(h => Printer.probe(h).then(info => ({ host: h, info })))));
-    } catch (e) {
-      throw (e.errors && e.errors[0]) || e;
-    }
+    const results = await Promise.allSettled(candidates.map(h => Printer.probe(h)));
+    const hit = results.findIndex(r => r.status === 'fulfilled');
+    if (hit < 0) throw results[0].reason;
+    host = candidates[hit];
+    const info = results[hit].value;
     Printer.host = host;
     $('printer-ip').value = host;
     S.host = host;
@@ -231,14 +243,13 @@ async function connect(host, { auto = false } = {}) {
     $('printer-ip').disabled = true;
     $('connect-btn').hidden = true;
     $('disconnect-btn').hidden = false;
-    S.cameras = await Printer.webcams().catch(() => []);
-    renderCameraList();
     startPolling();
+    await refreshCameras();
     // Keep the saved camera if it still exists; with a single camera there is nothing to choose.
-    const saved = S.camera && S.cameras.find(c => c.name === S.camera.name);
+    const saved = S.camera && (S.cameras.find(c => c.stream === S.camera.stream) || S.cameras.find(c => c.name === S.camera.name));
     if (saved) selectCamera(saved, { keepView: true, stay: !auto });
     else if (S.cameras.length === 1) selectCamera(S.cameras[0], { stay: false });
-    if (!S.cameras.length) status.textContent += ' · No cameras configured in Moonraker.';
+    if (!S.cameras.length) status.textContent += ' · No cameras found in Moonraker or crowsnest.conf.';
     return true;
   } catch (e) {
     status.textContent = auto ? '' : 'No Moonraker answered at ' + candidates.join(' or ') + ' (' + e.message + '). Check the address, and that this page’s origin is in Moonraker’s cors_domains.';
@@ -260,36 +271,141 @@ function disconnect() {
   $('printer-ip').disabled = false;
   $('connect-btn').hidden = false;
   $('disconnect-btn').hidden = true;
-  $('conn-status').textContent = 'Disconnected.';
+  setText('conn-status', 'Disconnected.');
   $('conn-status').dataset.kind = '';
   renderCameraList();
+  $('camera-list').hidden = true;
+  $('manual-cam-form').hidden = true;
   renderAll();
+}
+
+// Cameras come from two places: Moonraker's webcam list (what Mainsail /
+// Fluidd show) and crowsnest.conf, which can hold cameras never added to the
+// web UI. Crowsnest entries already covered by the webcam list are skipped.
+const normUrl = u => u.toLowerCase().replace(/\/\?/, '?').replace(/[?&]_probe=\d+/, '');
+
+// Cameras added by URL in Setup, remembered per printer.
+const manualCams = () => LS.get('manualCams:' + S.host, []);
+const saveManualCams = cams => LS.set('manualCams:' + S.host, cams);
+
+// Snapshot URL for a stream URL (ustreamer / mjpg-streamer / camera-streamer).
+function snapshotFor(stream) {
+  if (/action=stream/.test(stream)) return stream.replace('action=stream', 'action=snapshot');
+  if (/\/stream(\?|$)/.test(stream)) return stream.replace(/\/stream(\?|$)/, '/snapshot$1');
+  return null;
+}
+
+async function discoverCameras() {
+  const [listed, crow] = await Promise.all([Printer.webcams().catch(() => []), Printer.crowsnestCams()]);
+  const cams = listed.map(c => Object.assign({
+    name: c.name, source: 'Moonraker', service: c.service || 'webcam',
+    flipH: !!c.flip_horizontal, flipV: !!c.flip_vertical, reachable: true,
+  }, Printer.cameraUrls(c)));
+  // Probe in parallel but keep crowsnest.conf order.
+  const crowCams = await Promise.all(crow.map(async c => {
+    const options = Printer.crowsnestUrls(c);
+    const known = cams.some(k => options.some(o => normUrl(o.stream) === normUrl(k.stream)));
+    if (known) return null;
+    let found = null;
+    for (const o of options) {
+      if (await Printer.probeImage(o.snapshot)) { found = o; break; }
+    }
+    const pick = found || options[0];
+    return {
+      name: c.name, source: 'crowsnest', service: (c.mode || 'streamer') + ' · ' + pick.via,
+      flipH: false, flipV: false, reachable: !!found, stream: pick.stream, snapshot: pick.snapshot,
+    };
+  }));
+  crowCams.forEach(c => { if (c) cams.push(c); });
+  const manual = await Promise.all(manualCams().map(async c => Object.assign({
+    source: 'manual', service: 'stream URL', flipH: false, flipV: false, manual: true,
+    reachable: await Printer.probeImage(c.snapshot),
+  }, c)));
+  return cams.concat(manual);
+}
+
+let cameraKey = '';
+async function refreshCameras() {
+  if (!S.host) return;
+  const btn = $('rescan-cameras');
+  if (btn) btn.disabled = true;
+  const cams = await discoverCameras();
+  if (!S.host) return;  // disconnected meanwhile
+  const key = JSON.stringify(cams.map(c => [c.name, c.stream, c.reachable]));
+  S.cameras = cams;
+  if (key !== cameraKey || !$('rescan-cameras')) { cameraKey = key; renderCameraList(); }
+  else if (btn) btn.disabled = false;
 }
 
 function renderCameraList() {
   const list = $('camera-list');
-  list.hidden = !S.cameras.length;
-  list.innerHTML = '<p class="theme-label">Select camera</p>' + S.cameras.map((cam, i) => {
-    const urls = Printer.cameraUrls(cam);
-    const selected = S.camera && S.camera.name === cam.name;
-    return `<button type="button" class="camera-option${selected ? ' selected' : ''}" data-cam="${i}" aria-pressed="${selected}">
-      <img src="${esc(urls.snapshot)}" alt="" loading="lazy">
-      <span><b>${esc(cam.name)}</b><small>${esc(cam.service || 'webcam')}${selected ? ' · in use' : ' · click to use'}</small></span>
-    </button>`;
+  list.hidden = !S.host;
+  const head = `<div class="camera-list-head"><p class="theme-label">Select camera <span>${S.cameras.length} found</span></p>
+    <button type="button" class="text-button" id="rescan-cameras">${iconSvg('reset', 13)} Rescan</button></div>`;
+  list.innerHTML = head + (S.cameras.length ? '' : '<p class="empty-note">No cameras found. Check crowsnest and your webcam settings in Mainsail or Fluidd.</p>') + S.cameras.map((cam, i) => {
+    const selected = S.camera && S.camera.stream === cam.stream;
+    const state = !cam.reachable ? ' · not reachable' : selected ? ' · in use' : ' · click to use';
+    return `<div class="camera-row"><button type="button" class="camera-option${selected ? ' selected' : ''}${cam.reachable ? '' : ' unreachable'}" data-cam="${i}" aria-pressed="${selected}">
+      ${cam.reachable ? `<img src="${esc(cam.snapshot)}" alt="" loading="lazy">` : '<span class="cam-placeholder" aria-hidden="true"></span>'}
+      <span><b>${esc(cam.name)}</b><small>${esc(cam.source)} · ${esc(cam.service)}${state}</small></span>
+    </button>${cam.manual ? `<button type="button" class="text-button" data-remove-cam="${i}" aria-label="Remove ${esc(cam.name)}">Remove</button>` : ''}</div>`;
   }).join('');
+  $('manual-cam-form').hidden = list.hidden;
+  list.querySelectorAll('[data-remove-cam]').forEach(b => b.addEventListener('click', () => {
+    const cam = S.cameras[Number(b.dataset.removeCam)];
+    saveManualCams(manualCams().filter(c => c.stream !== cam.stream));
+    refreshCameras();
+  }));
   list.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => selectCamera(S.cameras[Number(b.dataset.cam)])));
+  $('rescan-cameras').addEventListener('click', refreshCameras);
 }
 
+async function addManualCamera(e) {
+  e.preventDefault();
+  const status = $('manual-cam-status');
+  let raw = $('manual-cam-url').value.trim();
+  if (!raw) return;
+  let stream;
+  if (/^https?:\/\//i.test(raw)) stream = raw;              // typed in full: use as is
+  else if (raw.startsWith('/')) stream = 'http://' + Printer.webHost() + raw;
+  else stream = 'http://' + raw;                            // host:port/path without scheme
+  try { new URL(stream); } catch (err) {
+    status.textContent = 'That is not a valid URL.'; status.dataset.kind = 'error'; return;
+  }
+  const snapshot = snapshotFor(stream);
+  if (!snapshot) {
+    status.textContent = 'Use an MJPEG stream URL ending in ?action=stream or /stream, so Axiscope can grab single frames for detection.';
+    status.dataset.kind = 'error';
+    return;
+  }
+  if (S.cameras.some(c => normUrl(c.stream) === normUrl(stream))) {
+    status.textContent = 'That camera is already in the list.'; status.dataset.kind = ''; return;
+  }
+  $('manual-cam-add').disabled = true;
+  status.textContent = 'Checking ' + snapshot + '…'; status.dataset.kind = '';
+  const ok = await Printer.probeImage(snapshot);
+  $('manual-cam-add').disabled = false;
+  const u = new URL(stream);
+  const cam = { name: u.host + u.pathname.replace(/\/$/, ''), stream, snapshot };
+  saveManualCams(manualCams().concat([cam]));
+  $('manual-cam-url').value = '';
+  status.textContent = ok ? 'Camera added.' : 'Added, but no image came back from ' + snapshot + '. Check the URL and that the streamer accepts connections from this computer.';
+  status.dataset.kind = ok ? 'ok' : 'error';
+  await refreshCameras();
+}
+
+// While Setup is open, look for cameras that were added or came online.
+setInterval(() => { if (S.tab === 'setup' && S.online && !document.hidden) refreshCameras(); }, 15000);
+
 function selectCamera(cam, { keepView = false, stay = false } = {}) {
-  const urls = Printer.cameraUrls(cam);
-  S.camera = { name: cam.name, stream: urls.stream, snapshot: urls.snapshot };
+  S.camera = { name: cam.name, stream: cam.stream, snapshot: cam.snapshot };
   LS.set('camera', S.camera);
   if (!keepView) {
-    S.view.flipH = !!cam.flip_horizontal;
-    S.view.flipV = !!cam.flip_vertical;
+    S.view.flipH = cam.flipH;
+    S.view.flipV = cam.flipV;
     LS.set('view', S.view);
   }
-  CameraView.setStream(urls.stream);
+  CameraView.setStream(cam.stream);
   CameraView.applyView();
   renderCameraList();
   renderView();
@@ -391,15 +507,15 @@ function renderAll() {
 function renderStatus() {
   const st = S.status;
   const label = !S.host ? 'OFFLINE' : S.online ? 'CONNECTED' : 'RECONNECTING';
-  $('conn-label').textContent = label;
+  setText('conn-label', label);
   $('conn-label').dataset.state = S.online ? 'ok' : 'off';
-  $('footer-status').innerHTML = !S.host ? 'Not connected <span class="footer-divider">/</span> Connect in Setup'
+  setHTML('footer-status', !S.host ? 'Not connected <span class="footer-divider">/</span> Connect in Setup'
     : S.online ? `Connected to ${esc(S.host)} <span class="footer-divider">/</span> ${isHomed() ? 'Homed' : 'Not homed'}`
-      : `Connection to ${esc(S.host)} lost <span class="footer-divider">/</span> Retrying`;
+      : `Connection to ${esc(S.host)} lost <span class="footer-divider">/</span> Retrying`);
   ['footer-dot', 'chip-dot'].forEach(id => $(id).classList.toggle('is-off', !S.online));
-  $('chip-host').textContent = S.host || 'Not connected';
-  $('chip-sub').textContent = st ? (st.toolchanger ? st.tools.length + ' tools' : 'No [toolchanger] found') + ' · Klipper' : 'Klipper · Moonraker';
-  $('chip-tools').textContent = st && st.tools.length ? 'T0–T' + Math.max(...st.tools) : '–';
+  setText('chip-host', S.host || 'Not connected');
+  setText('chip-sub', st ? (st.toolchanger ? st.tools.length + ' tools' : 'No [toolchanger] found') + ' · Klipper' : 'Klipper · Moonraker');
+  setText('chip-tools', st && st.tools.length ? 'T0–T' + Math.max(...st.tools) : '–');
 }
 
 function renderWorkflow() {
@@ -409,15 +525,15 @@ function renderWorkflow() {
     const el = $(id);
     el.classList.toggle('complete', state === 'complete');
     el.classList.toggle('current', state === 'current');
-    el.querySelector('.step-num').innerHTML = state === 'complete' ? iconSvg('check', 13) : num;
+    setHTML(el.querySelector('.step-num'), state === 'complete' ? iconSvg('check', 13) : num);
   };
   const allDone = tools.length > 0 && done === tools.length;
   step('wf-ref', S.ref ? 'complete' : 'current', '01');
   step('wf-align', !S.ref ? '' : allDone ? 'complete' : 'current', '02');
   step('wf-review', allDone ? 'current' : '', '03');
-  $('wf-ref-sub').textContent = S.ref ? 'T0 position captured' : 'Capture the T0 position';
-  $('wf-align-sub').textContent = `${done} of ${tools.length} tools calibrated`;
-  $('session-tag').textContent = Vision.settings.enabled ? 'AUTO XY · OPENCV' : 'MANUAL XY';
+  setText('wf-ref-sub', S.ref ? 'T0 position captured' : 'Capture the T0 position');
+  setText('wf-align-sub', `${done} of ${tools.length} tools calibrated`);
+  setText('session-tag', Vision.settings.enabled ? 'AUTO XY · OPENCV' : 'MANUAL XY');
 }
 
 let renderedTools = '';
@@ -425,7 +541,7 @@ function renderTools() {
   const st = S.status;
   const tools = st ? st.tools : [];
   const tn = activeTool();
-  $('tool-count').textContent = tools.length ? tools.length + ' tools available' : st && !st.toolchanger ? 'No toolchanger' : 'No tools';
+  setText('tool-count', tools.length ? tools.length + ' tools available' : st && !st.toolchanger ? 'No toolchanger' : 'No tools');
   const big = tools.length > 12;
   $('tool-select-wrap').hidden = !big;
   $('tool-tabs').hidden = big;
@@ -436,31 +552,31 @@ function renderTools() {
       const cap = n === 0 ? !!S.ref : !!newOffset(n);
       return `<button type="button" id="tool-${n}" data-tool="${n}" aria-pressed="${n === tn}" class="${n === tn ? 'selected' : ''}" title="${n === tn ? 'Active tool' : 'Change to T' + n}">T${n}${cap ? '<i></i>' : ''}</button>`;
     }).join('');
-    $('tool-select').innerHTML = tools.map(n => `<option value="${n}"${n === tn ? ' selected' : ''}>T${n}${n === 0 ? ' · Reference' : newOffset(n) ? ' · Captured' : ' · Not calibrated'}</option>`).join('');
+    setHTML('tool-select', tools.map(n => `<option value="${n}"${n === tn ? ' selected' : ''}>T${n}${n === 0 ? ' · Reference' : newOffset(n) ? ' · Captured' : ' · Not calibrated'}</option>`).join(''));
     if (tn < 0 && big) $('tool-select').insertAdjacentHTML('afterbegin', '<option selected disabled>No tool</option>');
   }
   const desc = $('tool-desc'), sub = $('tool-desc-sub');
-  if (!S.host) { desc.textContent = 'Connect a printer'; sub.textContent = 'Set the printer address in Setup'; }
-  else if (tn < 0) { desc.textContent = 'No tool picked up'; sub.textContent = 'Select a tool to run a tool change'; }
-  else if (tn === 0) { desc.textContent = 'Reference tool'; sub.textContent = 'The origin for all other tools'; }
-  else { desc.textContent = 'Align T' + tn + ' to reference'; sub.textContent = 'Center the nozzle on the crosshair'; }
+  if (!S.host) { setText(desc, 'Connect a printer'); setText(sub, 'Set the printer address in Setup'); }
+  else if (tn < 0) { setText(desc, 'No tool picked up'); setText(sub, 'Select a tool to run a tool change'); }
+  else if (tn === 0) { setText(desc, 'Reference tool'); setText(sub, 'The origin for all other tools'); }
+  else { setText(desc, 'Align T' + tn + ' to reference'); setText(sub, 'Center the nozzle on the crosshair'); }
 
-  $('tool-overlay').innerHTML = tn < 0 ? 'T– <span>NO TOOL</span>' : `T${tn} <span>${tn === 0 ? 'REFERENCE' : 'ACTIVE TOOL'}</span>`;
-  $('capture-label').textContent = tn === 0 ? 'Capture reference' : tn > 0 ? 'Capture T' + tn + ' position' : 'Capture position';
+  setHTML('tool-overlay', tn < 0 ? 'T– <span>NO TOOL</span>' : `T${tn} <span>${tn === 0 ? 'REFERENCE' : 'ACTIVE TOOL'}</span>`);
+  setText('capture-label', tn === 0 ? 'Capture reference' : tn > 0 ? 'Capture T' + tn + ' position' : 'Capture position');
   let hint = 'Offsets are calculated relative to T0';
   if (tn === 0) hint = S.ref ? `Reference X ${S.ref.x.toFixed(3)} · Y ${S.ref.y.toFixed(3)} · recapture to update` : 'Center T0 on the crosshair, then capture';
   else if (tn > 0) hint = !S.ref ? 'Capture T0 first; offsets are relative to it' : S.grabs[tn] ? 'Captured · recapture to update this position' : 'Center the nozzle, then capture';
-  $('capture-hint').textContent = hint;
+  setText('capture-hint', hint);
 }
 
 function renderPositions() {
   const p = S.status && S.status.pos;
   const f = v => (p ? v.toFixed(3) : '—');
-  $('cc-x').textContent = p ? f(p[0]) : '—';
-  $('cc-y').textContent = p ? f(p[1]) : '—';
-  $('cc-z').textContent = p ? f(p[2]) : '—';
-  $('pos-x').innerHTML = (p ? f(p[0]) : '—') + '<small>mm</small>';
-  $('pos-y').innerHTML = (p ? f(p[1]) : '—') + '<small>mm</small>';
+  setText('cc-x', p ? f(p[0]) : '—');
+  setText('cc-y', p ? f(p[1]) : '—');
+  setText('cc-z', p ? f(p[2]) : '—');
+  setHTML('pos-x', (p ? f(p[0]) : '—') + '<small>mm</small>');
+  setHTML('pos-y', (p ? f(p[1]) : '—') + '<small>mm</small>');
 }
 
 function renderMachine() {
@@ -468,7 +584,7 @@ function renderMachine() {
   const set = (id, ok, label) => {
     const b = $(id);
     b.dataset.state = !st ? '' : ok ? 'ok' : 'warn';
-    if (label) b.textContent = label;
+    if (label) setText(b, label);
   };
   set('btn-home', isHomed(), isHomed() ? 'Homed' : 'Home');
   $('btn-qgl').hidden = !st || st.qgl === null;
@@ -532,19 +648,19 @@ function configText() {
 function renderConfig() {
   const tools = S.status ? S.status.tools.filter(n => n !== 0) : [];
   const done = capturedCount();
-  $('config-code').textContent = configText();
-  $('config-count').textContent = `${done} / ${tools.length} tools`;
+  setText('config-code', configText());
+  setText('config-count', `${done} / ${tools.length} tools`);
   const captured = tools.filter(n => newOffset(n));
   const allSaved = captured.length > 0 && captured.every(n => S.saved[n]);
-  $('config-state').textContent = allSaved ? 'SAVED TO CONFIG' : 'PROPOSED CHANGES';
+  setText('config-state', allSaved ? 'SAVED TO CONFIG' : 'PROPOSED CHANGES');
   const canSave = !!(S.status && S.status.axiscope && S.status.axiscope.can_save_config);
   $('save-config').disabled = !canSave || !done;
   $('copy-config').disabled = !done;
-  $('config-note').innerHTML = !S.status || !S.status.axiscope
+  setHTML('config-note', !S.status || !S.status.axiscope
     ? 'The [axiscope] Klipper module is not loaded, so saving is unavailable. Copy the lines into your tool sections instead.'
     : !canSave
       ? 'Set <code>config_file_path</code> in [axiscope] to save offsets from here. Until then, copy the lines into your tool sections.'
-      : 'Saving writes through AXISCOPE_SAVE_TOOL_OFFSET to the file in <code>config_file_path</code>. Restart Klipper afterwards to load the new offsets.';
+      : 'Saving writes through AXISCOPE_SAVE_TOOL_OFFSET to the file in <code>config_file_path</code>. Restart Klipper afterwards to load the new offsets.');
 }
 
 function renderExtras() {
@@ -583,7 +699,7 @@ function renderBedMap(ax, axisMin, axisMax, pos) {
     html += `<circle cx="${cx}" cy="${cy}" r="4" class="bm-nozzle"/>
       <text x="${cx + 7}" y="${cy + 4}" class="bm-label bm-nozzle-label">(${pos[0].toFixed(1)}, ${pos[1].toFixed(1)})</text>`;
   }
-  svg.innerHTML = html;
+  setHTML(svg, html);
 }
 
 function renderBusy() {
@@ -597,11 +713,11 @@ function renderBusy() {
 function renderView() {
   const v = S.view;
   $('crosshair-enabled').checked = v.crosshair;
-  $('zoom-label').textContent = Math.round(v.zoom * 100) + '%';
+  setText('zoom-label', Math.round(v.zoom * 100) + '%');
   $('flip-h').setAttribute('aria-pressed', v.flipH);
   $('flip-v').setAttribute('aria-pressed', v.flipV);
   $('contrast').value = v.contrast;
-  $('cam-name').textContent = S.camera ? S.camera.name : '—';
+  setText('cam-name', S.camera ? S.camera.name : '—');
   CameraView.applyView();
 }
 
@@ -709,15 +825,15 @@ function initLed() {
   }, 150);
   const render = () => {
     const duty = S.led.enabled ? S.led.pwm : 0;
-    $('camera-control-summary').textContent = S.led.template.trim() ? 'LED ' + duty + '%' : 'NOT SET UP';
-    $('led-duty').textContent = `PWM ${duty}% · duty ${(duty / 100).toFixed(2)}`;
+    setText('camera-control-summary', S.led.template.trim() ? 'LED ' + duty + '%' : 'NOT SET UP');
+    setText('led-duty', `PWM ${duty}% · duty ${(duty / 100).toFixed(2)}`);
     $('pwm-meter').style.width = duty + '%';
     $('led-enabled').checked = S.led.enabled;
     $('led-fieldset').disabled = !S.led.enabled;
     $('led-enabled').disabled = !S.led.template.trim();
-    $('led-note').textContent = S.led.template.trim()
+    setText('led-note', S.led.template.trim()
       ? 'Sends: ' + S.led.template.trim()
-      : 'Set an LED command in Setup to drive your camera LED from here.';
+      : 'Set an LED command in Setup to drive your camera LED from here.');
     LS.set('led', S.led);
   };
   ledDial = buildDial(document.querySelector('[data-dial="led-pwm"]'),
@@ -735,7 +851,7 @@ function initIncrements() {
   const steps = [0.01, 0.05, 0.1, 0.5, 1, 10];
   if (!steps.includes(S.step)) S.step = 0.1;
   const render = () => {
-    $('increments').innerHTML = steps.map(s => `<button type="button" data-step="${s}" class="${s === S.step ? 'selected' : ''}" aria-pressed="${s === S.step}">${s}</button>`).join('');
+    setHTML('increments', steps.map(s => `<button type="button" data-step="${s}" class="${s === S.step ? 'selected' : ''}" aria-pressed="${s === S.step}">${s}</button>`).join(''));
   };
   $('increments').addEventListener('click', e => {
     const b = e.target.closest('[data-step]');
@@ -764,6 +880,7 @@ function initEvents() {
 
   $('conn-form').addEventListener('submit', e => { e.preventDefault(); connect($('printer-ip').value); });
   $('disconnect-btn').addEventListener('click', disconnect);
+  $('manual-cam-form').addEventListener('submit', addManualCamera);
 
   $('tool-tabs').addEventListener('click', e => {
     const b = e.target.closest('[data-tool]');
@@ -826,9 +943,9 @@ function init() {
   CameraView.init(S.view);
   CameraView.onFeedState = state => {
     const labels = { none: 'NO FEED', connecting: 'CONNECTING', live: 'LIVE FEED', error: 'FEED ERROR' };
-    $('feed-label').textContent = labels[state] + (state === 'live' && CameraView.frame ? ' · ' + CameraView.frame.width + '×' + CameraView.frame.height : '');
+    setText('feed-label', labels[state] + (state === 'live' && CameraView.frame ? ' · ' + CameraView.frame.width + '×' + CameraView.frame.height : ''));
     $('feed-label-wrap').dataset.state = state;
-    $('camera-empty-text').textContent = state === 'error' ? 'The camera stream could not be loaded' : 'No camera connected';
+    setText('camera-empty-text', state === 'error' ? 'The camera stream could not be loaded' : 'No camera connected');
     $('camera-empty').hidden = state === 'live' || state === 'connecting';
   };
   initIncrements();
@@ -844,7 +961,7 @@ function init() {
   const guess = S.host || window.location.hostname;
   if (guess) {
     navigate('setup');
-    $('conn-status').textContent = 'Looking for your printer…';
+    setText('conn-status', 'Looking for your printer…');
     connect(guess, { auto: true }).then(ok => {
       if (ok && S.camera) return;
       if (!ok) notice('Enter your printer’s address to begin.');

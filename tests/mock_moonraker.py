@@ -27,6 +27,7 @@ TRUE_OFFSETS = {0: (0.0, 0.0), 1: (0.35, -0.42), 2: (-0.48, 0.27), 3: (0.21, 0.1
 CAMERA_XY = (150.0, 150.0)
 PX_PER_MM, ANGLE, MIRROR = 380.0, math.radians(7.0), True
 W, H = 1280, 720
+CAM_PORT = int(os.environ.get("CAM_PORT", 18080))  # streamer ports: CAM_PORT, CAM_PORT+1
 
 app = Flask(__name__)
 lock = threading.Lock()
@@ -122,10 +123,38 @@ def info():
 
 @app.route("/server/webcams/list")
 def webcams():
+    # Only the first camera is registered in the web UI; the others exist
+    # only in crowsnest.conf (see CROWSNEST_CONF), like on many printers.
     return jsonify(result={"webcams": [{
         "name": "nozzle_cam", "service": "mjpegstreamer-adaptive",
-        "stream_url": "/webcam/?action=stream", "snapshot_url": "/webcam/?action=snapshot",
+        "stream_url": "http://localhost:%d/?action=stream" % CAM_PORT,
+        "snapshot_url": "http://localhost:%d/?action=snapshot" % CAM_PORT,
         "flip_horizontal": False, "flip_vertical": False}]})
+
+
+CROWSNEST_CONF = ("""[crowsnest]
+log_path: ~/printer_data/logs/crowsnest.log
+
+[cam nozzle_cam]
+mode: ustreamer                  # duplicate of the webcam list entry
+port: {0}
+device: /dev/video0
+resolution: 1280x720
+
+[cam side_cam]
+mode: ustreamer
+port: {1}                      # served directly by this mock
+resolution: 1280x720
+
+[cam bed_cam]
+mode: camera-streamer
+port: {2}                      # nothing listens here: shows as unreachable
+""").format(CAM_PORT, CAM_PORT + 1, CAM_PORT + 2)
+
+
+@app.route("/server/files/config/crowsnest.conf")
+def crowsnest_conf():
+    return Response(CROWSNEST_CONF, mimetype="text/plain")
 
 
 @app.route("/printer/gcode/script", methods=["GET", "POST"])
@@ -166,17 +195,31 @@ def jpeg():
     return cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])[1].tobytes()
 
 
-@app.route("/webcam/")
-def webcam():
-    if request.args.get("action") == "snapshot":
-        return Response(jpeg(), mimetype="image/jpeg")
+def side_jpeg():
+    img = np.full((H, W, 3), 38, np.uint8)
+    cv2.putText(img, "side_cam (crowsnest only)", (60, H // 2), cv2.FONT_HERSHEY_SIMPLEX, 2, (190, 220, 160), 3)
+    return cv2.imencode(".jpg", img)[1].tobytes()
 
-    def stream():
-        while True:
-            frame = jpeg()
-            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
-            time.sleep(0.1)
-    return Response(stream(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+def streamer(make_frame):
+    """A ustreamer-like app: /?action=snapshot and /?action=stream."""
+    cam = Flask("cam")
+
+    @cam.route("/")
+    @cam.route("/webcam/")
+    def index():
+        if request.args.get("action") == "snapshot":
+            return Response(make_frame(), mimetype="image/jpeg")
+
+        def stream():
+            while True:
+                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + make_frame() + b"\r\n"
+                time.sleep(0.1)
+        return Response(stream(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    return cam
+
+
+app.add_url_rule("/webcam/", "webcam", streamer(jpeg).view_functions["index"])
 
 
 @app.route("/_mock/state")
@@ -185,4 +228,8 @@ def mock_state():
 
 
 if __name__ == "__main__":
+    from werkzeug.serving import make_server
+    for port, frame in ((CAM_PORT, jpeg), (CAM_PORT + 1, side_jpeg)):
+        threading.Thread(target=make_server("0.0.0.0", port, streamer(frame), threaded=True).serve_forever,
+                         daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 7125)), threaded=True)

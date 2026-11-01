@@ -263,6 +263,14 @@
             <p class="form-status" id="conn-status" role="status"></p>
           </form>
           <div class="camera-list" id="camera-list" hidden></div>
+          <form class="conn-form manual-cam" id="manual-cam-form" novalidate hidden>
+            <label for="manual-cam-url">Add a camera by stream URL</label>
+            <div class="tool-count-form">
+              <input id="manual-cam-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.1.50:8081/?action=stream or /webcam3/?action=stream">
+              <button type="submit" class="secondary" id="manual-cam-add">Add camera</button>
+            </div>
+            <p class="form-status" id="manual-cam-status" role="status"></p>
+          </form>
         </section>
 
         <section class="panel setup-panel" aria-labelledby="align-settings-title">

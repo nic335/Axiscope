@@ -52,17 +52,88 @@ const Printer = {
 
   webcams() { return this.get('/server/webcams/list', 5000).then(r => r.result.webcams || []); },
 
-  // Camera URLs from Moonraker can be absolute (another host name) or
-  // relative; always serve them through the printer address we reached.
+  // Host name without any port, e.g. "voron.local".
+  hostname() {
+    return this.host.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+  },
+
+  // Where the web UI (nginx) lives: camera proxy paths like /webcam2/ are
+  // served there, not by Moonraker's own port 7125.
+  webHost() {
+    return this.host.replace(/^https?:\/\//, '').replace(/:7125$/, '');
+  },
+
+  // Camera URLs from Moonraker can be absolute (often with a host name the
+  // browser can't resolve) or relative. Absolute: keep port + path, swap in
+  // the printer's host name. Relative: resolve against the web UI.
+  resolveCameraUrl(u) {
+    if (/^[a-z]+:\/\//i.test(u)) {
+      try {
+        const p = new URL(u);
+        return 'http://' + this.hostname() + (p.port ? ':' + p.port : '') + p.pathname + p.search;
+      } catch (e) { /* fall through */ }
+    }
+    return 'http://' + this.webHost() + (u.startsWith('/') ? u : '/' + u);
+  },
+
   cameraUrls(cam) {
-    const pathOf = u => {
-      try { const p = new URL(u); return p.pathname + p.search; } catch (e) { return u; }
-    };
-    const stream = this.url(pathOf(cam.stream_url || '/webcam/?action=stream'));
+    const stream = this.resolveCameraUrl(cam.stream_url || '/webcam/?action=stream');
     const snapshot = cam.snapshot_url
-      ? this.url(pathOf(cam.snapshot_url))
+      ? this.resolveCameraUrl(cam.snapshot_url)
       : stream.replace('action=stream', 'action=snapshot');
     return { stream, snapshot };
+  },
+
+  // [cam ...] sections of crowsnest.conf, read through Moonraker's file API.
+  // Cameras configured only in crowsnest never appear in the webcam list.
+  async crowsnestCams() {
+    let text;
+    try {
+      const res = await fetch(this.url('/server/files/config/crowsnest.conf'), { cache: 'no-store' });
+      if (!res.ok) return [];
+      text = await res.text();
+    } catch (e) {
+      return [];
+    }
+    const cams = [];
+    let cur = null;
+    text.split(/\r?\n/).forEach(raw => {
+      const line = raw.replace(/\s[#;].*$/, '').replace(/^[#;].*$/, '').trim();
+      if (!line) return;
+      const sec = line.match(/^\[\s*cam\s+([^\]]+?)\s*\]$/i);
+      if (sec) { cur = { name: sec[1] }; cams.push(cur); return; }
+      if (line.startsWith('[')) { cur = null; return; }
+      const kv = line.match(/^([\w-]+)\s*[:=]\s*(.*)$/);
+      if (cur && kv) cur[kv[1].toLowerCase()] = kv[2].trim();
+    });
+    return cams.map((c, i) => Object.assign(c, { port: Number(c.port) || 8080 + i }));
+  },
+
+  // Candidate URLs for a crowsnest camera: the nginx proxy path that the
+  // standard Mainsail/Fluidd setup maps to its port (8080 -> /webcam/,
+  // 8081 -> /webcam2/, ...), then the streamer's port directly (no_proxy).
+  crowsnestUrls(cam) {
+    const out = [];
+    const idx = cam.port - 8080;
+    if (idx >= 0 && idx < 4) {
+      const base = 'http://' + this.webHost() + '/webcam' + (idx ? idx + 1 : '') + '/';
+      out.push({ stream: base + '?action=stream', snapshot: base + '?action=snapshot', via: 'proxy' });
+    }
+    const direct = 'http://' + this.hostname() + ':' + cam.port + '/';
+    out.push({ stream: direct + '?action=stream', snapshot: direct + '?action=snapshot', via: 'port ' + cam.port });
+    return out;
+  },
+
+  // Image loads work cross-origin without CORS, so they can test a snapshot URL.
+  probeImage(url, timeout = 4000) {
+    return new Promise(resolve => {
+      const img = new Image();
+      const done = ok => { clearTimeout(t); img.onload = img.onerror = null; resolve(ok); };
+      const t = setTimeout(() => done(false), timeout);
+      img.onload = () => done(img.naturalWidth > 0);
+      img.onerror = () => done(false);
+      img.src = url + (url.includes('?') ? '&' : '?') + '_probe=' + Date.now();
+    });
   },
 };
 
