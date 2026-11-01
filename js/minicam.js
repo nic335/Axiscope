@@ -54,7 +54,8 @@ const Minicam = {
     }
     const camOpts = cams.map(c => `<option value="${esc(c.stream)}">${esc(c.name)}${c.reachable ? '' : ' (offline)'}</option>`).join('');
     // The pipeline views need OpenCV and an alignment camera to process.
-    const visionOk = S.camera && Vision.available && Vision.available.opencv;
+    const visionOk = S.camera && Vision.available && Vision.available.opencv
+      && !(Vision.missing || []).includes('vision_frame');
     const visOpts = visionOk
       ? `<optgroup label="Vision pipeline · ${esc(S.camera.name)}">${VISION_STAGES.map(([k, l]) => `<option value="vision:${k}">${l}</option>`).join('')}</optgroup>`
       : '';
@@ -108,6 +109,7 @@ const Minicam = {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
             body: JSON.stringify({ camera_url: S.camera.snapshot, stage: this._visionStage, params: Vision.params(), lock: Vision.lock }),
           });
+          if (res.status === 404 || res.status === 405) throw new Error('the Axiscope service is older than this page. ' + RESTART_HINT);
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
           const url = URL.createObjectURL(await res.blob());
           const old = this._visionUrl;

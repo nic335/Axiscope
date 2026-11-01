@@ -24,6 +24,10 @@ const ALIGN_FIELDS = [
   { key: 'feed', label: 'Move speed', min: 1, max: 100, step: 1, unit: 'mm/s' },
   { key: 'approach', label: 'Backlash approach', min: 0, max: 2, step: 0.05, unit: 'mm' },
 ];
+// Backend features this page uses (see API_FEATURES in app.py).
+const NEEDED_FEATURES = ['detect', 'align', 'orient', 'lock', 'mapping', 'vision_frame'];
+const RESTART_HINT = 'Restart the axiscope service (Mainsail → Services → axiscope → Restart, or sudo systemctl restart axiscope).';
+
 const TERMINAL = ['converged', 'not_converged', 'calibrated', 'failed', 'cancelled'];
 
 const Vision = {
@@ -226,9 +230,20 @@ const Vision = {
       this.available = { opencv: false, error: 'Axiscope backend not reachable (' + e.message + ')' };
     }
     const a = this.available;
+    // The page and the service update separately: the page reloads on its
+    // own, the Python service only when restarted.
+    const have = a.features || [];
+    this.missing = a.opencv ? NEEDED_FEATURES.filter(f => !have.includes(f)) : [];
+    // A service from before feature reporting can't say what it lacks.
+    const missingText = a.features ? this.missing.join(', ') : 'it predates this version';
+    $('service-banner').hidden = !this.missing.length;
+    if (this.missing.length) {
+      setText('service-banner', 'The Axiscope service is running older code than this page (' + missingText + '). ' + RESTART_HINT + ' Then reload this page.');
+    }
     $('vision-status').textContent = a.opencv ? 'OpenCV ' + a.opencv_version + ' on the Axiscope host' : a.error || 'OpenCV unavailable';
-    $('vision-pill').textContent = a.opencv ? 'Ready' : 'Unavailable';
-    $('vision-pill').dataset.state = a.opencv ? 'ok' : 'warn';
+    $('vision-pill').textContent = !a.opencv ? 'Unavailable' : this.missing.length ? 'Restart needed' : 'Ready';
+    $('vision-pill').dataset.state = a.opencv && !this.missing.length ? 'ok' : 'warn';
+    if (this.missing.length) $('vision-status').textContent += ' · service needs a restart (' + missingText + ')';
     $('det-engine').textContent = a.opencv ? 'OPENCV ' + a.opencv_version : 'UNAVAILABLE';
     if (!a.opencv) $('det-sub').textContent = 'OpenCV is not installed on the Axiscope host. Re-run install.sh to enable detection.';
     // Resume a job that was running before a page reload.

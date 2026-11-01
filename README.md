@@ -242,6 +242,9 @@ Opening `http://localhost:3000` connects to the mock by itself. The mock offers 
 Run the tests with `python -m pytest tests`.
 
 ## Troubleshooting And FAQ
+### "Method not allowed" / a red banner says the service is older than the page
+The page and the Axiscope service update separately: the browser loads the new page right away, but the Python service keeps running its old code until it restarts. Restart it from Mainsail (**Services → axiscope → Restart**) or with `sudo systemctl restart axiscope`, then reload the page. Updates through Moonraker's update manager restart it for you.
+
 ### Camera is not shown in Axiscope
 Press **Rescan** under **Setup**. Axiscope reads both Moonraker's webcam list and `crowsnest.conf`. If a crowsnest camera shows as *not reachable*, its port has no nginx path and the streamer only listens locally: set `no_proxy: true` for that camera in `crowsnest.conf`, or add its stream with **Add a camera by stream URL**.
 

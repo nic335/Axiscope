@@ -12,6 +12,9 @@ body { background: var(--canvas, #101211); }
 .status-dot.is-off { background: var(--warn); }
 .notice[data-kind="error"] { color: var(--warn); }
 
+/* service older than the page: stays until fixed */
+.service-banner { margin: 0 0 14px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent); border-radius: min(var(--radius), 8px); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); color: var(--warn); font-size: 12px; line-height: 1.5; }
+
 /* ---- camera ---- */
 .camera-viewport { background: #0c0f0c; }
 .camera-stage { position: absolute; transform-origin: 50% 50%; transition: transform .12s ease; }
