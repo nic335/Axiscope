@@ -103,6 +103,7 @@ def api_align_start():
                 target=body.get('target'),
                 camera_key=camera_url,
                 tool=body.get('tool'),
+                mode=body.get('mode', 'align'),
             )
         except HardwareError as e:
             return _error(str(e))

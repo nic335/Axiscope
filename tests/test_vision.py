@@ -149,3 +149,110 @@ def test_cancel_and_revert():
     start = a2.snapshot()["start_position"]
     a2.revert()
     assert np.allclose(rig2.position()[:2], start[:2])
+
+
+@pytest.mark.parametrize("angle", [0, 90, 180, 270])
+@pytest.mark.parametrize("mirror", [False, True])
+def test_autoalign_any_quarter_turn_camera(angle, mirror):
+    # e.g. a camera mounted 90 deg: X- moves the image down.
+    rig = SimRig(angle_deg=angle, mirror=mirror, start=(150.3, 149.8))
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.005))
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    m = st["result"]["mapping"]
+    assert m["mirrored"] == mirror
+    assert any("+X moves the image" in s["message"] for s in st["steps"])
+
+
+class LaggyCamera(SimRig):
+    """After every move the camera keeps serving the old picture for a few frames."""
+
+    def __init__(self, lag=3, **kw):
+        super().__init__(**kw)
+        self.lag = lag
+        self.stale = None
+        self.stale_left = 0
+
+    def _go(self, target):
+        if self.stale_left == 0:
+            self.stale = self.nozzle_px()
+        self.stale_left = self.lag
+        super()._go(target)
+
+    def frame(self):
+        if self.stale_left > 0:
+            self.stale_left -= 1
+            self.frame_no += 1
+            from synthetic import render_nozzle
+            return render_nozzle(*self.stale, self.w, self.h, seed=self.seed + self.frame_no)
+        return super().frame()
+
+
+def test_autoalign_waits_for_lagging_camera():
+    rig = LaggyCamera(lag=3, angle_deg=90, start=(150.3, 149.8))
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.005))
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]
+    assert abs(st["result"]["mapping"]["px_per_mm"] - 380) < 10   # learned from fresh frames
+    assert st["result"]["corrections"] <= 3
+
+
+def test_lagging_camera_without_wait_is_caught_not_wandering():
+    # With the wait disabled the stale frames corrupt the mapping; the run
+    # must end in a clear state, never by drifting off unchecked.
+    rig = LaggyCamera(lag=3, angle_deg=90, start=(150.3, 149.8))
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.005, stable_timeout=0, max_move=1.0))
+    a.run()
+    st = a.snapshot()
+    assert st["state"] in ("failed", "converged", "not_converged")
+    assert np.hypot(*(rig.pos - np.array([150.3, 149.8]))) < 2.0
+
+
+class WrongWay(SimRig):
+    """After the probes, the printer moves the opposite way (as if axes were swapped)."""
+
+    def move_relative(self, dx, dy, feed, approach):
+        if len(self.moves) >= 2:
+            dx, dy = -dx * 2.5, -dy * 2.5
+        super().move_relative(dx, dy, feed, approach)
+
+
+def test_stops_when_corrections_make_it_worse():
+    rig = WrongWay(start=(150.05, 149.97))
+    a = AutoAligner(rig, rig, PARAMS, dict(FAST, tolerance=0.002, max_iterations=10, max_move=3.0))
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "failed"
+    assert "worse" in st["message"] or "safety" in st["message"] or "Lost" in st["message"]
+    assert len(rig.moves) <= 2 + 4   # stopped early, did not use all 10 corrections
+
+
+@pytest.mark.parametrize("angle,mirror,x_dir,y_dir", [
+    (0, True, "right", "up"),      # image y points down, so mirrored Y = "up"
+    (90, True, "down", "right"),   # the reported case: X- moves the image up/down
+    (90, False, "down", "left"),
+    (180, False, "left", "up"),
+])
+def test_orient_reports_directions_and_returns_home(angle, mirror, x_dir, y_dir):
+    rig = SimRig(angle_deg=angle, mirror=mirror, start=(150.2, 149.9))
+    start = rig.position()
+    a = AutoAligner(rig, rig, PARAMS, FAST, mode="orient")
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "calibrated", st["message"]
+    m = st["result"]["mapping"]
+    assert (m["x_dir"], m["y_dir"]) == (x_dir, y_dir)
+    assert st["result"]["consistent"]
+    assert np.allclose(rig.position()[:2], start[:2], atol=1e-6)   # back where it started
+
+
+def test_tracking_survives_rings_appearing_at_frame_edge():
+    # Reported case: 90 deg camera, the outer ring is clipped by the frame edge
+    # at the start and comes into view after the probe move.
+    rig = SimRig(angle_deg=90, mirror=True, start=(150.25, 149.8))
+    a = AutoAligner(rig, rig, PARAMS, FAST)
+    a.run()
+    st = a.snapshot()
+    assert st["state"] == "converged", st["message"]

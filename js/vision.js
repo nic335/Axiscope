@@ -24,7 +24,7 @@ const ALIGN_FIELDS = [
   { key: 'feed', label: 'Move speed', min: 1, max: 100, step: 1, unit: 'mm/s' },
   { key: 'approach', label: 'Backlash approach', min: 0, max: 2, step: 0.05, unit: 'mm' },
 ];
-const TERMINAL = ['converged', 'not_converged', 'failed', 'cancelled'];
+const TERMINAL = ['converged', 'not_converged', 'calibrated', 'failed', 'cancelled'];
 
 const Vision = {
   settings: null,       // detection settings (persisted)
@@ -148,9 +148,19 @@ const Vision = {
       this.kick();
     });
     $('auto-align').addEventListener('click', () => this.startAlign());
+    $('check-orientation').addEventListener('click', () => this.startAlign('orient'));
+    $('align-orient').addEventListener('click', () => {
+      const r = this.job && this.job.result;
+      if (r && r.mapping) this.applyOrientation(r.mapping);
+    });
     $('jog-align-circle').addEventListener('click', () => this.startAlign());
     $('align-cancel').addEventListener('click', () => Api.alignCancel().catch(e => notice(e.message, 'error')));
-    $('align-retry').addEventListener('click', () => this.startAlign());
+    $('align-copy').addEventListener('click', async () => {
+      if (!this.job) return;
+      try { await copyText(this.logText(this.job)); notice('Alignment log copied to the clipboard.'); }
+      catch (e) { notice(e.message, 'error'); }
+    });
+    $('align-retry').addEventListener('click', () => this.startAlign(this.job && this.job.mode === 'orient' ? 'orient' : 'align'));
     $('align-badge').addEventListener('click', () => $('align-panel').scrollIntoView({ block: 'center', behavior: 'smooth' }));
     $('align-dismiss').addEventListener('click', () => { $('align-badge').hidden = true; $('align-panel').hidden = true; this.job = null; this.schedule(true); });
     $('align-revert').addEventListener('click', async () => {
@@ -278,7 +288,7 @@ const Vision = {
     if (S.busy) reasons.length = 0;
     const ok = !reasons.length && !S.busy;
     const why = S.busy ? 'Alignment running' : ok ? 'Scan, probe-move and centre the nozzle on the crosshair' : reasons[0];
-    ['auto-align', 'jog-align-circle'].forEach(id => {
+    ['auto-align', 'jog-align-circle', 'check-orientation'].forEach(id => {
       $(id).disabled = !ok;
       $(id).title = why;
     });
@@ -286,7 +296,7 @@ const Vision = {
   },
 
   // ------------------------------------------------------- auto alignment
-  async startAlign() {
+  async startAlign(mode = 'align') {
     if (S.busy) return;
     const tool = activeTool();
     S.busy = true;
@@ -300,6 +310,7 @@ const Vision = {
         settings: this.align,
         target: CameraView.target(),
         tool,
+        mode,
       });
       this.showJob(job);
       // The panel sits below the camera; bring it into view.
@@ -335,7 +346,8 @@ const Vision = {
   showJob(job) {
     this.job = job;
     $('align-panel').hidden = false;
-    const labels = { running: 'RUNNING', converged: 'CENTERED', not_converged: 'NOT WITHIN TOLERANCE', failed: 'FAILED', cancelled: 'CANCELLED', idle: 'IDLE' };
+    const labels = { running: 'RUNNING', converged: 'CENTERED', not_converged: 'NOT WITHIN TOLERANCE', calibrated: 'ORIENTATION MEASURED', failed: 'FAILED', cancelled: 'CANCELLED', idle: 'IDLE' };
+    setText('align-title-text', job.mode === 'orient' ? 'Camera orientation' : 'Auto alignment');
     $('align-state').textContent = labels[job.state] || job.state.toUpperCase();
     $('align-panel').dataset.state = job.state;
     $('align-cancel').hidden = job.state !== 'running';
@@ -356,27 +368,69 @@ const Vision = {
     if (!done) return;
     const r = job.result;
     const metric = (label, value) => `<div><span>${label}</span><b>${value}</b></div>`;
-    $('align-metrics').innerHTML = r ? [
-      metric('RESIDUAL', r.error_mm.toFixed(4) + '<small>mm</small>'),
-      metric('CORRECTIONS', r.corrections + ' / ' + this.align.max_iterations),
-      metric('SCALE', r.mapping.px_per_mm.toFixed(0) + '<small>px/mm</small>'),
-      metric('MOVED', `${signed(r.moved_mm[0])} / ${signed(r.moved_mm[1])}`),
-    ].join('') : '';
-    const canAccept = !!r && job.tool === activeTool();
     const v = $('align-verdict');
-    if (job.state === 'converged') {
-      v.textContent = `T${job.tool} is centred within ${r.tolerance} mm. Check the camera view, then accept to capture this position.`;
-    } else if (job.state === 'not_converged') {
-      v.textContent = `Stopped after ${r.corrections} corrections, ${r.error_mm.toFixed(4)} mm from the crosshair (tolerance ${r.tolerance} mm). You can still accept, nudge it manually, or run again.`;
-    } else if (job.state === 'failed') {
-      v.textContent = job.message;
+    const orient = job.mode === 'orient';
+    if (orient && r) {
+      const m = r.mapping;
+      $('align-metrics').innerHTML = [
+        metric('SCALE', m.px_per_mm.toFixed(0) + '<small>px/mm</small>'),
+        metric('+X MOVES IMAGE', m.x_dir.toUpperCase()),
+        metric('+Y MOVES IMAGE', m.y_dir.toUpperCase()),
+        metric('RETURN ERROR', r.return_error_px.toFixed(1) + '<small>px</small>'),
+      ].join('');
+      // Apply once per run, when the result first arrives.
+      if (this._orientedRun !== job.started) {
+        this._orientedRun = job.started;
+        this.applyOrientation(m, true);
+      }
+      v.textContent = `Camera is rotated ${Math.round(m.rotation_deg)}°${m.mirrored ? ' and mirrored' : ''} relative to the machine. `
+        + `The view now shows +X to the right and +Y up, so the jog arrows match the screen. `
+        + (r.consistent ? 'The nozzle came back to where it started, so moves and camera agree.'
+          : `The nozzle came back ${r.return_error_px.toFixed(1)} px (${r.return_error_mm.toFixed(3)} mm) off; check for backlash or image lag.`);
     } else {
-      v.textContent = 'Cancelled. The toolhead stays where it stopped.';
+      $('align-metrics').innerHTML = r ? [
+        metric('RESIDUAL', r.error_mm.toFixed(4) + '<small>mm</small>'),
+        metric('CORRECTIONS', r.corrections + ' / ' + this.align.max_iterations),
+        metric('SCALE', r.mapping.px_per_mm.toFixed(0) + '<small>px/mm</small>'),
+        metric('MOVED', `${signed(r.moved_mm[0])} / ${signed(r.moved_mm[1])}`),
+      ].join('') : '';
+      if (job.state === 'converged') {
+        v.textContent = `T${job.tool} is centred within ${r.tolerance} mm. Check the camera view, then accept to capture this position.`;
+      } else if (job.state === 'not_converged') {
+        v.textContent = `Stopped after ${r.corrections} corrections, ${r.error_mm.toFixed(4)} mm from the crosshair (tolerance ${r.tolerance} mm). You can still accept, nudge it manually, or run again.`;
+      } else if (job.state === 'failed') {
+        v.textContent = job.message;
+      } else {
+        v.textContent = 'Cancelled. The toolhead stays where it stopped.';
+      }
     }
-    $('align-accept').hidden = !r;
+    const canAccept = !orient && !!r && job.tool === activeTool();
+    $('align-accept').hidden = orient || !r;
     $('align-accept').disabled = !canAccept;
     $('align-accept-label').textContent = job.tool === 0 ? 'Accept & capture reference' : `Accept & capture T${job.tool}`;
-    $('align-revert').hidden = !job.start_position;
+    $('align-revert').hidden = orient || !job.start_position;
+    // After an alignment, the learned mapping can also orient the view.
+    $('align-orient').hidden = orient || !(r && r.mapping);
+  },
+
+  // Rotate/flip the camera *view* so +X is right and +Y is up on screen.
+  // Detection and moves use the raw frame, so this is purely visual.
+  applyOrientation(mapping, quiet) {
+    const t = viewForMapping(mapping);
+    Object.assign(S.view, { rotate: t.rotate, flipH: t.flipH, flipV: t.flipV });
+    LS.set('view', S.view);
+    renderView();
+    if (!quiet) notice(`View turned ${t.rotate}°${t.flipH ? ' and mirrored' : ''}: the jog arrows now match the screen.`);
+  },
+
+  // Plain-text run log for bug reports.
+  logText(job) {
+    const lines = [(job.mode === 'orient' ? 'Camera orientation' : 'Auto alignment') + ' · ' + job.state + (job.tool != null ? ' · T' + job.tool : '')];
+    (job.steps || []).forEach(st => lines.push(st.phase.padEnd(12) + st.message));
+    if (job.result && job.result.mapping) lines.push('mapping ' + JSON.stringify(job.result.mapping));
+    lines.push('settings ' + JSON.stringify(this.align));
+    lines.push('detection ' + JSON.stringify(this.params()));
+    return lines.join('\n');
   },
 
   // A different camera gets a fresh start.

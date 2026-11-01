@@ -28,6 +28,7 @@ ALIGN_DEFAULTS = {
     "probe_distance": 0.5,    # mm per probe move
     "max_move": 3.0,          # mm, any single correction larger than this aborts
     "settle": 0.4,            # s to wait after a move before grabbing frames
+    "stable_timeout": 4.0,    # s to wait for the image to catch up and hold still
     "samples": 3,             # frames per measurement (median)
     "feed": 10.0,             # mm/s
     "approach": 0.0,          # mm backlash approach (0 disables)
@@ -40,6 +41,7 @@ _LIMITS = {
     "probe_distance": (float, 0.05, 3.0),
     "max_move": (float, 0.1, 20.0),
     "settle": (float, 0.0, 5.0),
+    "stable_timeout": (float, 0.0, 20.0),
     "samples": (int, 1, 9),
     "feed": (float, 1.0, 100.0),
     "approach": (float, 0.0, 2.0),
@@ -76,6 +78,13 @@ def merge_settings(user=None):
     return s
 
 
+def _image_dir(v):
+    """Screen direction of an image-space vector (image y points down)."""
+    if abs(v[0]) >= abs(v[1]):
+        return "right" if v[0] > 0 else "left"
+    return "down" if v[1] > 0 else "up"
+
+
 def describe_mapping(J):
     """Human readable scale / rotation / mirror of a px-per-mm matrix."""
     det = float(np.linalg.det(J))
@@ -84,14 +93,23 @@ def describe_mapping(J):
         "px_per_mm": round(math.sqrt(abs(det)), 2),
         "rotation_deg": round(math.degrees(math.atan2(J[1, 0], J[0, 0])), 2),
         "mirrored": det < 0,
+        # Where the nozzle moves in the raw image for +X / +Y machine moves.
+        "x_dir": _image_dir(J[:, 0]),
+        "y_dir": _image_dir(J[:, 1]),
     }
+
+
+def mapping_text(J):
+    m = describe_mapping(J)
+    return ("%(px_per_mm).0f px/mm; +X moves the image %(x_dir)s, +Y moves it %(y_dir)s "
+            "(rotated %(rotation_deg).0f deg%(mir)s)" % dict(m, mir=", mirrored" if m["mirrored"] else ""))
 
 
 class AutoAligner:
     """Runs one alignment. Thread-safe status via snapshot()."""
 
     def __init__(self, printer, camera, detect_params=None, settings=None,
-                 target=None, camera_key=None, tool=None):
+                 target=None, camera_key=None, tool=None, mode="align"):
         self.printer = printer
         self.camera = camera
         self.detect_params = detect_params or {}
@@ -99,11 +117,14 @@ class AutoAligner:
         self.target = None if target is None else np.array(target, float)
         self.camera_key = camera_key
         self.tool = tool
+        self.mode = "orient" if mode == "orient" else "align"
+        self._settle_note = ""
         self._lock = threading.Lock()
         self._cancel = threading.Event()
         self._thread = None
         self._status = {
-            "state": "idle",      # idle|running|converged|not_converged|failed|cancelled
+            "state": "idle",      # idle|running|converged|not_converged|calibrated|failed|cancelled
+            "mode": self.mode,
             "phase": None,
             "message": "",
             "tool": tool,
@@ -158,9 +179,49 @@ class AutoAligner:
         if s["settle"]:
             time.sleep(s["settle"])
 
-    def _measure(self, hint=None, ref=None):
-        """Median nozzle centre over several fresh frames, or None."""
+    def _wait_stable(self, hint, ref, before, min_departure):
+        """After a move, grab frames until the image has caught up with it.
+
+        Cameras buffer frames, so the first snapshots after a move can still
+        show the old position, and two stale frames agree with each other.
+        So first wait for the nozzle to leave `before` (when the move is big
+        enough to see), then until two consecutive frames agree.
+        Returns (frames used, settled?)."""
+        timeout = self.settings["stable_timeout"]
+        if timeout <= 0:
+            return 0, True
+        deadline = time.time() + timeout
+        departed = min_departure <= 0 or before is None
+        prev, frames = None, 0
+        while time.time() < deadline:
+            self._check_cancel()
+            res = detect(self.camera.frame(), self.detect_params, hint=hint)
+            frames += 1
+            b = res["best"]
+            if b is None or (ref is not None and not self._same_nozzle(ref, b)):
+                continue
+            p = np.array([b["x"], b["y"]])
+            tol = max(1.5, 0.01 * max(r["r"] for r in b["rings"]))
+            if not departed and np.hypot(*(p - before)) > min_departure:
+                departed = True
+            elif departed and prev is not None and np.hypot(*(p - prev)) <= tol:
+                return frames, True
+            prev, hint = p, (b["x"], b["y"])
+        return frames, False
+
+    def _measure(self, hint=None, ref=None, before=None, min_departure=0.0):
+        """Median nozzle centre over several fresh frames, or None.
+
+        With `before` set (a move just happened), first wait for the camera
+        image to catch up with the move."""
         s = self.settings
+        self._settle_note = ""
+        if before is not None:
+            frames, ok = self._wait_stable(hint, ref, before, min_departure)
+            if not ok:
+                self._settle_note = " (image still changing after %.0f s)" % s["stable_timeout"]
+            elif frames > 2:
+                self._settle_note = " (camera caught up after %d frames)" % frames
         pts, last = [], None
         for i in range(s["samples"]):
             self._check_cancel()
@@ -191,10 +252,11 @@ class AutoAligner:
 
     @staticmethod
     def _same_nozzle(ref, b):
-        """Guard against jumping to another circle: largest ring must match."""
-        ra = max(r["r"] for r in ref["rings"])
-        rb = max(r["r"] for r in b["rings"])
-        return abs(ra - rb) <= max(4.0, 0.15 * ra)
+        """Guard against jumping to another circle: at least one ring radius
+        must match. (Not "the largest ring": outer rings come and go when the
+        nozzle nears the frame edge or the edge is rough.)"""
+        return any(abs(ra["r"] - rb["r"]) <= max(3.0, 0.08 * ra["r"])
+                   for ra in ref["rings"] for rb in b["rings"])
 
     def _probe(self, axis, p_from, ref):
         """Move `axis` by the probe distance, return (image delta per mm, new pixel)."""
@@ -204,7 +266,8 @@ class AutoAligner:
             # The retry on the opposite side has to undo the first probe too.
             move[axis] = d * sign if sign > 0 else -2.0 * d
             self._move(*move)
-            p, _ = self._measure(hint=None, ref=ref)
+            # Expect the image to move at least a few pixels for a probe move.
+            p, _ = self._measure(hint=None, ref=ref, before=p_from, min_departure=3.0)
             if p is not None:
                 return (p - p_from) / (d * sign), p
             self._step("probe_%s" % "xy"[axis],
@@ -218,10 +281,12 @@ class AutoAligner:
 
     def _calibrate(self, p0, ref):
         jx, p1 = self._probe(0, p0, ref)
-        self._step("probe_x", "Probe X: %.1f px/mm" % np.hypot(*jx),
+        self._step("probe_x", "Probe X: %.1f px/mm, image moved %s%s"
+                   % (np.hypot(*jx), _image_dir(jx), self._settle_note),
                    px=[round(float(v), 2) for v in p1], position=self.printer.position())
         jy, p2 = self._probe(1, p1, ref)
-        self._step("probe_y", "Probe Y: %.1f px/mm" % np.hypot(*jy),
+        self._step("probe_y", "Probe Y: %.1f px/mm, image moved %s%s"
+                   % (np.hypot(*jy), _image_dir(jy), self._settle_note),
                    px=[round(float(v), 2) for v in p2], position=self.printer.position())
         J = np.column_stack([jx, jy])
         self._validate(J)
@@ -248,7 +313,10 @@ class AutoAligner:
         self._set(state="running", started=time.time())
         try:
             result = self._run()
-            state = "converged" if result["converged"] else "not_converged"
+            if self.mode == "orient":
+                state = "calibrated"
+            else:
+                state = "converged" if result["converged"] else "not_converged"
             self._set(state=state, result=result, finished=time.time())
         except Cancelled:
             self._step("cancelled", "Cancelled; the toolhead stays where it is.")
@@ -280,6 +348,9 @@ class AutoAligner:
         self._step("scan", "Nozzle at (%.1f, %.1f) px, rings r=%s px" % (p[0], p[1], rings),
                    px=[round(float(v), 2) for v in p])
 
+        if self.mode == "orient":
+            return self._orient(start, p, ref)
+
         J = None
         if s["reuse_calibration"] and self.camera_key in _calibration_cache:
             J = _calibration_cache[self.camera_key].copy()
@@ -287,16 +358,33 @@ class AutoAligner:
                        % describe_mapping(J)["px_per_mm"])
         else:
             J, p = self._calibrate(p, ref)
-        self._step("calibration", "Mapping: %(px_per_mm).1f px/mm, rotated %(rotation_deg).1f deg"
-                   % describe_mapping(J) + (", mirrored" if np.linalg.det(J) < 0 else ""))
+        self._step("calibration", "Mapping: " + mapping_text(J), mapping=describe_mapping(J))
 
         converged = False
         corrections = 0
         err_mm = None
+        last_err, worse = None, 0
         while True:
             err_px = self.target - p
             move = np.linalg.solve(J, err_px)
             err_mm = float(np.hypot(*move))
+            # Safety: corrections that keep making things worse mean the
+            # mapping or the detection is wrong. Stop instead of wandering.
+            if last_err is not None and err_mm > s["tolerance"] * 3:
+                if err_mm > last_err * 3:
+                    worse = 2
+                elif err_mm > last_err * 1.2:
+                    worse += 1
+                else:
+                    worse = 0
+                if worse >= 2:
+                    raise AlignError(
+                        "Corrections are making it worse (error %.3f -> %.3f mm), so the "
+                        "run stopped. Learned mapping: %s. If the nozzle visibly moved "
+                        "differently, the detection is tracking something else or the camera "
+                        "image lags; try a higher Settle time or tighter radius range."
+                        % (last_err, err_mm, mapping_text(J)))
+            last_err = err_mm
             if err_mm <= s["tolerance"]:
                 converged = True
                 self._step("verify", "Within tolerance: %.4f mm (%.2f px)"
@@ -316,10 +404,18 @@ class AutoAligner:
                        % (corrections, s["max_iterations"], move[0], move[1], err_mm),
                        move=[round(float(v), 4) for v in move], error_mm=round(err_mm, 4))
             self._move(*move)
-            predicted = p + J @ move
-            p_new, _ = self._measure(hint=tuple(predicted), ref=ref)
+            expected = J @ move
+            predicted = p + expected
+            p_new, _ = self._measure(hint=tuple(predicted), ref=ref, before=p,
+                                     min_departure=0.5 * float(np.hypot(*expected)))
             if p_new is None:
                 raise AlignError("Lost the nozzle after correction %d." % corrections)
+            observed = p_new - p
+            self._step("observe", "Image moved %.1f px %s (expected %.1f px %s)%s"
+                       % (np.hypot(*observed), _image_dir(observed),
+                          np.hypot(*expected), _image_dir(expected), self._settle_note),
+                       observed_px=[round(float(v), 2) for v in observed],
+                       expected_px=[round(float(v), 2) for v in expected])
             # Broyden update from the observed motion, if the move was big enough
             # for the image delta to carry information beyond detection noise.
             if np.hypot(*move) * describe_mapping(J)["px_per_mm"] > 4.0:
@@ -350,6 +446,42 @@ class AutoAligner:
             "target_px": [round(float(v), 2) for v in self.target],
             "rings": ref["rings"],
             "mapping": describe_mapping(J),
+        }
+
+    def _orient(self, start, p0, ref):
+        """Control moves only: learn how machine moves look in the image, then
+        go back to the start and check the nozzle returns to the same pixel."""
+        J, p = self._calibrate(p0, ref)
+        self._step("calibration", "Mapping: " + mapping_text(J), mapping=describe_mapping(J))
+        pos = self.printer.position()
+        back = np.array([start[0] - pos[0], start[1] - pos[1]])
+        self._step("return", "Moving back to the start: X%+.3f Y%+.3f mm" % tuple(back))
+        self._move(*back)
+        expected = J @ back
+        p_back, _ = self._measure(hint=tuple(p + expected), ref=ref, before=p,
+                                  min_departure=0.5 * float(np.hypot(*expected)))
+        if p_back is None:
+            raise AlignError("Lost the nozzle when moving back to the start.")
+        ret_px = float(np.hypot(*(p_back - p0)))
+        ret_mm = ret_px / describe_mapping(J)["px_per_mm"]
+        r_main = max(r["r"] for r in ref["rings"])
+        consistent = ret_px <= max(3.0, 0.02 * r_main)
+        self._step("verify", "Back at start: nozzle %.1f px (%.4f mm) from where it began%s%s"
+                   % (ret_px, ret_mm, self._settle_note,
+                      "" if consistent else ". That is more than expected: check for backlash, "
+                      "a loose camera or image lag (raise Settle time)."),
+                   return_px=round(ret_px, 2))
+        if self.camera_key is not None:
+            _calibration_cache[self.camera_key] = J.copy()
+        return {
+            "mode": "orient",
+            "mapping": describe_mapping(J),
+            "return_error_px": round(ret_px, 2),
+            "return_error_mm": round(ret_mm, 4),
+            "consistent": consistent,
+            "start_position": start,
+            "final_position": self.printer.position(),
+            "rings": ref["rings"],
         }
 
     def revert(self):

@@ -81,6 +81,7 @@
             <div class="view-tools">
               <button type="button" class="chip-btn" id="flip-h" aria-pressed="false" title="Mirror the image horizontally">Flip H</button>
               <button type="button" class="chip-btn" id="flip-v" aria-pressed="false" title="Mirror the image vertically">Flip V</button>
+              <button type="button" class="chip-btn" id="rotate-view" title="Rotate the view 90°">Rotate <span id="rotate-label">0°</span></button>
             </div>
             <label class="contrast-control" for="contrast">Contrast <input id="contrast" type="range" min="50" max="300" value="100"></label>
             <div class="zoom-controls">
@@ -119,7 +120,10 @@
               </div>
               <div class="detection-result">
                 <span id="detection-status" role="status">Waiting for a frame…</span>
-                <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
+                <div class="detection-buttons">
+                  <button id="check-orientation" class="secondary" type="button" title="Move +0.5 mm in X and Y, see how the image moves, return, and turn the view to match the machine">Check orientation</button>
+                  <button id="auto-align" class="primary" type="button"><i data-icon="scope" data-size="14"></i>Auto align</button>
+                </div>
               </div>
               <details class="detection-advanced">
                 <summary>Advanced tuning</summary>
@@ -144,7 +148,7 @@
 
           <section class="align-panel" id="align-panel" hidden aria-labelledby="align-title">
             <div class="align-head">
-              <h3 id="align-title">Auto alignment <small id="align-state">RUNNING</small></h3>
+              <h3 id="align-title"><span id="align-title-text">Auto alignment</span> <small id="align-state">RUNNING</small></h3>
               <button type="button" class="text-button" id="align-cancel">Cancel</button>
             </div>
             <ol class="align-steps" id="align-steps" aria-live="polite"></ol>
@@ -154,7 +158,9 @@
               <div class="align-actions">
                 <button type="button" class="primary" id="align-accept"><i data-icon="check" data-size="15"></i><span id="align-accept-label">Accept &amp; capture</span></button>
                 <button type="button" class="secondary" id="align-retry">Run again</button>
+                <button type="button" class="secondary" id="align-orient" hidden>Turn view to match machine</button>
                 <button type="button" class="text-button" id="align-revert"><i data-icon="reset" data-size="14"></i>Revert move</button>
+                <button type="button" class="text-button" id="align-copy">Copy log</button>
                 <button type="button" class="text-button" id="align-dismiss">Dismiss</button>
               </div>
             </div>

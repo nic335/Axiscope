@@ -51,19 +51,31 @@ const CameraView = {
   setFrame(width, height) {
     if (this.frame && this.frame.width === width && this.frame.height === height) return;
     this.frame = { width, height };
-    if (!window.matchMedia('(max-width:760px)').matches) {
-      this.viewport.style.aspectRatio = width + ' / ' + height;
-    }
+    this.setAspect();
     this.fit();
     this.draw();
     this.onFrameSize && this.onFrameSize(this.frame);
   },
 
-  // Contain-fit the stage (image + overlay) inside the viewport.
+  rotated() { return ((this.view.rotate || 0) % 180) !== 0; },
+
+  // The viewport keeps the camera's landscape shape on desktop; a view
+  // turned 90/270 degrees is fitted inside it (side bars) instead of making
+  // the panel taller than the screen.
+  setAspect() {
+    if (!this.frame || window.matchMedia('(max-width:760px)').matches) return;
+    const { width, height } = this.frame;
+    this.viewport.style.aspectRatio = Math.max(width, height) + ' / ' + Math.min(width, height);
+  },
+
+  // Contain-fit the stage (image + overlay) inside the viewport. A 90/270
+  // degree view turns the stage on its side, so fit its swapped box.
   fit() {
     const vw = this.viewport.clientWidth, vh = this.viewport.clientHeight;
     const f = this.frame || { width: 4, height: 3 };
-    const s = Math.min(vw / f.width, vh / f.height);
+    const s = this.rotated()
+      ? Math.min(vw / f.height, vh / f.width)
+      : Math.min(vw / f.width, vh / f.height);
     const w = f.width * s, h = f.height * s;
     Object.assign(this.stage.style, {
       width: w + 'px', height: h + 'px',
@@ -74,8 +86,11 @@ const CameraView = {
   applyView() {
     const v = this.view;
     const sx = (v.flipH ? -1 : 1) * v.zoom, sy = (v.flipV ? -1 : 1) * v.zoom;
-    this.stage.style.transform = `scale(${sx}, ${sy})`;
+    // CSS applies the right-most transform first: flip/zoom, then rotate.
+    this.stage.style.transform = `rotate(${v.rotate || 0}deg) scale(${sx}, ${sy})`;
     this.img.style.filter = `contrast(${v.contrast}%)`;
+    this.setAspect();
+    this.fit();
     this.draw();
   },
 
@@ -139,3 +154,25 @@ const CameraView = {
     }
   },
 };
+
+// View rotation + horizontal flip that makes machine moves look natural on
+// screen: +X to the right and +Y up. `mapping.matrix` columns are the image
+// motion (px per mm, image y down) for +X and +Y machine moves.
+function viewForMapping(mapping) {
+  const m = mapping.matrix;
+  const ax = [m[0][0], m[1][0]], ay = [m[0][1], m[1][1]];
+  const nx = Math.hypot(...ax), ny = Math.hypot(...ay);
+  let best = null;
+  for (const rotate of [0, 90, 180, 270]) {
+    for (const flipH of [false, true]) {
+      const r = rotate * Math.PI / 180;
+      const t = v => {
+        const x = flipH ? -v[0] : v[0], y = v[1];
+        return [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)];
+      };
+      const score = t(ax)[0] / nx - t(ay)[1] / ny;   // +X right, +Y up (screen y down)
+      if (!best || score > best.score) best = { rotate, flipH, flipV: false, score };
+    }
+  }
+  return best;
+}

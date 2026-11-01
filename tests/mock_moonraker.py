@@ -25,7 +25,8 @@ from synthetic import render_nozzle  # noqa: E402
 CONFIG_OFFSETS = {0: (0.0, 0.0), 1: (0.10, -0.10), 2: (-0.20, 0.05), 3: (0.0, 0.0)}
 TRUE_OFFSETS = {0: (0.0, 0.0), 1: (0.35, -0.42), 2: (-0.48, 0.27), 3: (0.21, 0.18)}
 CAMERA_XY = (150.0, 150.0)
-PX_PER_MM, ANGLE, MIRROR = 380.0, math.radians(7.0), True
+PX_PER_MM, MIRROR = 380.0, True
+ANGLE = math.radians(float(os.environ.get("MOCK_ANGLE", 7.0)))  # camera rotation; 90 = side-mounted
 W, H = 1280, 720
 CAM_PORT = int(os.environ.get("CAM_PORT", 18080))  # streamer ports: CAM_PORT, CAM_PORT+1
 

@@ -56,6 +56,8 @@ body { background: var(--canvas, #101211); }
 .detection-toggles .text-button { margin-left: auto; }
 .detection-advanced-body p { margin-top: 4px !important; }
 #detection-status { min-width: 0; overflow-wrap: anywhere; }
+.detection-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.detection-buttons .secondary { white-space: nowrap; }
 
 /* ---- auto alignment ---- */
 .align-panel { border-top: 1px solid var(--line); padding: calc(15px * var(--density)); background: color-mix(in srgb, var(--surface), var(--accent) 4%); }

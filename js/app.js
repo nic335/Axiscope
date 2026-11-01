@@ -90,7 +90,7 @@ const S = {
   grabs: {},                            // tool -> {x, y, ox, oy} (position + offset at capture)
   saved: {},                            // tool -> true once written to config
   step: LS.get('step', 0.1),
-  view: Object.assign({ crosshair: true, zoom: 1, flipH: false, flipV: false, contrast: 100 }, LS.get('view', {})),
+  view: Object.assign({ crosshair: true, zoom: 1, flipH: false, flipV: false, rotate: 0, contrast: 100 }, LS.get('view', {})),
   led: Object.assign({ enabled: false, pwm: 60, template: '' }, LS.get('led', {})),
   busy: false,                          // auto alignment in progress
 };
@@ -733,6 +733,7 @@ function renderView() {
   setText('zoom-label', Math.round(v.zoom * 100) + '%');
   $('flip-h').setAttribute('aria-pressed', v.flipH);
   $('flip-v').setAttribute('aria-pressed', v.flipV);
+  setText('rotate-label', (v.rotate || 0) + '°');
   $('contrast').value = v.contrast;
   setText('cam-name', S.camera ? S.camera.name : '—');
   CameraView.applyView();
@@ -921,6 +922,7 @@ function initEvents() {
   $('crosshair-enabled').addEventListener('change', e => { S.view.crosshair = e.target.checked; LS.set('view', S.view); renderView(); });
   $('flip-h').addEventListener('click', () => { S.view.flipH = !S.view.flipH; LS.set('view', S.view); renderView(); });
   $('flip-v').addEventListener('click', () => { S.view.flipV = !S.view.flipV; LS.set('view', S.view); renderView(); });
+  $('rotate-view').addEventListener('click', () => { S.view.rotate = ((S.view.rotate || 0) + 90) % 360; LS.set('view', S.view); renderView(); });
   $('contrast').addEventListener('input', e => { S.view.contrast = Number(e.target.value); LS.set('view', S.view); CameraView.applyView(); });
   const zoomBy = d => {
     const i = ZOOM_STEPS.findIndex(z => z >= S.view.zoom - 1e-6);
