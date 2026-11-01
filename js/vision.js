@@ -270,6 +270,7 @@ const Vision = {
       this.last = res;
       this._fails = 0;
       this.updateLock(res);
+      $('lock-release').hidden = !this.lock;
       if (this.shouldDetect()) CameraView.setDetection(res, this.settings.edges ? res.edges : null);
       this.renderDetection(res);
     } catch (e) {
@@ -322,6 +323,9 @@ const Vision = {
     this.lock = null;
     this.userLock = false;
     $('lock-release').hidden = true;
+    this.last = null;
+    CameraView.setDetection(null);
+    setText('detection-status', 'Lock released, searching the whole frame…');
     this.schedule(true);
   },
 
@@ -337,7 +341,11 @@ const Vision = {
     const kx = CameraView.frame && res.width ? CameraView.frame.width / res.width : 1;
     const d = t ? Math.hypot(b.x * kx - t[0], b.y * kx - t[1]) / kx : 0;
     const radii = b.rings.map(r => Math.round(r.r)).join('/');
-    const lockNote = !this.userLock ? '' : res.locked ? ' · locked' : ' · locked target not found, showing best circle';
+    const kind = this.userLock ? 'locked (clicked)' : 'auto-locked';
+    const lockNote = !this.lock ? ''
+      : this.lock.x == null ? ` · ${kind}, searching by ring size`
+      : res.locked === false ? ` · ${kind} target not found, showing best circle`
+      : ` · ${kind}`;
     el.textContent = `${b.rings.length} ring${b.rings.length === 1 ? '' : 's'} · r ${radii} px · ${d.toFixed(1)} px from crosshair · ${Math.round(res.ms)} ms${lockNote}`;
   },
 
