@@ -79,6 +79,7 @@ const Vision = {
         v => {
           s[key] = key === 'min_coverage' ? v / 100 : v;
           if (after) after(v);
+          if (key === 'min_radius' || key === 'max_radius') this.updateRadiusGuide();
           this.save();
           this.kick();
         });
@@ -136,6 +137,7 @@ const Vision = {
     ALIGN_FIELDS.forEach(f => { $('set-' + f.key).value = this.align[f.key]; });
     $('set-reuse').checked = this.align.reuse_calibration;
     CameraView.showOverlay = s.enabled && s.overlay;
+    this.updateRadiusGuide();
     if (!s.enabled) CameraView.setDetection(null);
     this.renderEligibility();
   },
@@ -488,6 +490,12 @@ const Vision = {
     $('align-revert').hidden = orient || !job.start_position;
     // After an alignment, the learned mapping can also orient the view.
     $('align-orient').hidden = orient || !(r && r.mapping);
+  },
+
+  updateRadiusGuide() {
+    const s = this.settings;
+    CameraView.radiusGuide = s.enabled ? { min: s.min_radius, max: s.max_radius } : null;
+    CameraView.draw();
   },
 
   // Saved mapping for the current camera (from the backend).

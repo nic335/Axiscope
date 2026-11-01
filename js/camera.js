@@ -10,6 +10,7 @@ const CameraView = {
   view: null,           // {crosshair, zoom, flipH, flipV, contrast}
   detection: null,      // last detection result {best, candidates, width, height}
   showOverlay: true,
+  radiusGuide: null,    // {min, max} detection radius range in source px, drawn on the crosshair
   onFrameSize: null,
   onPick: null,         // (x, y) in source pixels when the image is clicked
   onFeedState: null,
@@ -149,6 +150,14 @@ const CameraView = {
       el('circle', { cx, cy, r: gap, fill: 'none' }, g);
       const t = gap * 0.3;
       el('path', { d: `M${cx - t} ${cy}H${cx + t}M${cx} ${cy - t}V${cy + t}` }, g);
+    }
+
+    // Detection radius range around the target: the nozzle's rings should
+    // fall between these two circles.
+    if (this.radiusGuide) {
+      const g = el('g', { class: 'ov-range' });
+      el('circle', { cx, cy, r: this.radiusGuide.min, class: 'ov-range-min' }, g);
+      el('circle', { cx, cy, r: this.radiusGuide.max, class: 'ov-range-max' }, g);
     }
 
     const det = this.detection;

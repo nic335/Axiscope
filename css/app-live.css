@@ -27,6 +27,9 @@ body { background: var(--canvas, #101211); }
 .camera-viewport.can-pick { cursor: crosshair; }
 .detection-status-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 .detection-status-wrap .text-button { font-size: 10px; }
+.ov-range circle { fill: none; stroke-width: 1; }
+.ov-range-min { stroke: #79d5f5; stroke-dasharray: 2 3; opacity: .8; }
+.ov-range-max { stroke: #79d5f5; stroke-dasharray: 8 4; opacity: .8; }
 .ov-candidate { stroke: #a3ac9f; stroke-width: 1; fill: none; opacity: .45; stroke-dasharray: 2 4; }
 .ov-error { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 3 3; }
 .camera-empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: #858e82; text-align: center; padding: 20px; }
@@ -76,6 +79,8 @@ body { background: var(--canvas, #101211); }
 .overlay-legend .lg-det { stroke: var(--accent); stroke-width: 1.6; fill: none; stroke-dasharray: 3 2; }
 .overlay-legend .lg-lock { stroke: var(--accent); stroke-width: 1.6; fill: none; }
 .overlay-legend .lg-cand { stroke: #a3ac9f; stroke-width: 1; fill: none; stroke-dasharray: 1.5 2.5; opacity: .7; }
+.overlay-legend .lg-min { stroke: #79d5f5; stroke-width: 1; fill: none; stroke-dasharray: 1.5 2; }
+.overlay-legend .lg-max { stroke: #79d5f5; stroke-width: 1; fill: none; stroke-dasharray: 4 2; }
 .overlay-legend .lg-err { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 3 3; }
 
 /* ---- auto alignment ---- */
